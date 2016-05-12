@@ -91,6 +91,14 @@ class AttachmentPreviewPlugin extends Plugin
         $pdf = array(
             'pdf' => 'addPDF'
         );
+        $office = array(
+            'doc' => 'addGoogleDocsViewer',
+            'docx' => 'addGoogleDocsViewer',
+            'xls' => 'addGoogleDocsViewer',
+            'xlsx' => 'addGoogleDocsViewer',
+            'ppt' => 'addGoogleDocsViewer',
+            'pptx' => 'addGoogleDocsViewer'
+        );
         $images = array(
             'bmp' => 'addIMG',
             'svg' => 'addIMG',
@@ -108,7 +116,7 @@ class AttachmentPreviewPlugin extends Plugin
         // Merge the arrays together as per instruction..
         switch ($config->get('attachment-allowed')) {
             case 'all':
-                $allowed_extensions = $higher_risk + $pdf + $images;
+                $allowed_extensions = $higher_risk + $pdf + $images + $office;
                 break;
             case 'pdf':
                 $allowed_extensions = $pdf;
@@ -123,11 +131,18 @@ class AttachmentPreviewPlugin extends Plugin
                 $allowed_extensions = array();
         }
 
-        if($config->get('attachment-video')){
-            $allowed_extensions['mp4'] = 'addVideo';
-            $allowed_extensions['ogv'] = 'addVideo';
-            $allowed_extensions['webm'] = 'addVideo';
-            $allowed_extensions['3gp'] = 'addVideo';
+        // If the box is ticket, add em, if they want em all, assume they want video too..
+        // This doesn't mean youtube will be embedded, but attachments will.
+        if ($config->get('attachment-video') || $config->get('attachment-allowed') == 'all') {
+            foreach (array(
+                'mp4',
+                'ogv',
+                'webm',
+                '3gp',
+                'flv'
+            ) as $f) {
+                $allowed_extensions[$f] = 'addVideo';
+            }
         }
 
         if (! count($allowed_extensions)) {
@@ -234,12 +249,13 @@ class AttachmentPreviewPlugin extends Plugin
         }
     }
 
-    private function addVideo(DOMDocument $doc, DOMElement $link){
+    private function addVideo(DOMDocument $doc, DOMElement $link)
+    {
         $video = $doc->createElement('video');
-        $video->setAttribute('controls',1);
+        $video->setAttribute('controls', 1);
         $source = $doc->createElement('source');
         $source->setAttribute('src', $link->getAttribute('href'));
-        $source->setAttribute('type','video/' . strtolower(substr(strrchr($link->textContent, '.'), 1)));
+        $source->setAttribute('type', 'video/' . strtolower(substr(strrchr($link->textContent, '.'), 1)));
         $video->appendChild($source);
         $this->wrap($doc, $link, $video);
     }
@@ -280,6 +296,18 @@ class AttachmentPreviewPlugin extends Plugin
         $text_element = $doc->createElement('pre');
         $text_element->nodeValue = $this->convertAttachmentUrlToFileContents($url);
         $this->wrap($doc, $link, $text_element);
+    }
+
+    private function addGoogleDocViewer(DOMDocument $doc, DOMElement $link)
+    {
+        // Recreate something like: <iframe style="width: 900px; height: 900px;" src="http://docs.google.com/gview?url=urltoyourworddocument&embedded=true" height="240" width="320" frameborder="0"></iframe>
+        $gdoc = $doc->createElement('iframe');
+        $gdoc->setAttribute('style', 'width: 100%; height: 1000px;');
+        $gdoc->setAttribute('src', 'http://docs.google.com/gview?url=' . $link->getAttribute('href') . '&embedded=true');
+        $gdoc->setAttribute('height', '1000');
+        $gdoc->setAttribute('width', '100%');
+        $gdoc->setAttribute('frameborder', 0);
+        $this->wrap($doc, $link, $gdoc);
     }
 
     /**

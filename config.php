@@ -22,7 +22,9 @@ class AttachmentPreviewPluginConfig extends PluginConfig
 
     /**
      * Build an Admin settings page.
+     *
      * {@inheritDoc}
+     *
      * @see PluginConfig::getOptions()
      */
     function getOptions()
@@ -41,7 +43,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig
             'attachment-allowed' => new ChoiceField(array(
                 'label' => $__('Choose the types of attachments to inline.'),
                 'default' => 'pdf-image',
-                'hint' => $__("While HTML and Text documents are filtered before being inserted in the DOM, there is always a chance this is riskier than necessary, Has no effect if txt & html extensions are not allowed to be attached in the first place."),
+                'hint' => $__("While HTML and Text documents are filtered before being inserted in the DOM, there is always a chance this is riskier than necessary, Has no effect if txt & html extensions are not allowed to be attached in the first place. ALL also includes a Google Docs viewer for docx/xls etc files."),
                 'choices' => array(
                     'none' => $__('Safest: OFF'),
                     'pdf' => $__('PDF Only'),
