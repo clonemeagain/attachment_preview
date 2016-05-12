@@ -236,7 +236,8 @@ class AttachmentPreviewPlugin extends Plugin
      */
     private function addYoutube(DOMDocument $doc, DOMElement $link)
     {
-        if ($youtube_id = $this->getYoutubeIdFromUrl($link->getAttribute('href')) !== FALSE) {
+        $youtube_id = $this->getYoutubeIdFromUrl($link->getAttribute('href'));
+        if ($youtube_id !== FALSE) {
             // Now we can add an iframe so the video is instanly playable.
             // eg: <iframe width="560" height="349" src="http://www.youtube.com/embed/something?rel=0&hd=1" frameborder="0" allowfullscreen></iframe>
             // TODO: Make responsive.. if required.
