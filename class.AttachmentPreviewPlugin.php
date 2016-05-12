@@ -4,10 +4,62 @@ require_once (INCLUDE_DIR . 'class.file.php');
 require_once (INCLUDE_DIR . 'class.format.php');
 require_once ('config.php');
 
+/**
+ * Provides in-line attachments, and an interface to the wrapper.
+ *
+ * Even when you don't give anyone permission to inline attachments it will still provide
+ * a back-end to the DOM, allowing you to write plugins that don't have to wrap the whole DOM yourself. :-)
+ *
+ *
+ *
+ *
+ * Great for injecting simple things, like a script, stylesheet, single widget, element etc..
+ *
+ * EG: To inject a script to the tickets pages for both agents and customers:
+ * <?php
+ *
+ * // Create the new element to inject/replace existing
+ * $dom = new DOMDocument();
+ * $element = $dom->createElement('script');
+ *
+ * // Build a structure to send to the plugin with everything we should need.
+ * $structure = (object)[
+ * 'regex' => '/tickets\.php/', // Which pages do we operate on?
+ * 'element' => $element, // The DOMElement to replace/inject etc.
+ * 'locator' => 'tag', // EG: tag/id/xpath
+ * 'replace_found' => FALSE, // default
+ * 'expression' => 'body' // which tag/id/xpath etc.
+ * ];
+ * $sendable = array($structure); // You might wish to send multiple structures.
+ * Signal::send('attachments.wrapper', $this, $sendable);
+ * ?>
+ * *
+ * Where $this is from your class (It's what class.signal.php says anyway.. not sure what I would do with it)
+ * Where /REGEX/ is a valid SERVER_URI regex for which pages you want the structure appended.
+ * Where 'TAG' is the type of match, either "tag" or "id", where "tag" matches ALL TAGS.. so, 'a' would append 'structure' to all <a> elements!
+ * Obviously "id" is preferred. Put here so you can use <head> as a selector.
+ * use it wisely. Essentially, if there is only ONE tag, that works. If there are many, I have to do them all.. it's only fair.
+ *
+ * For complicated queries, like those requiring XPath, you can also use "xpath" in your structure!
+ * eg:
+ * $structure = new STdClas'/some_regex/' => array('xpath' => '"//*[contains(@class, MySecretSauceClassName)]"', 'structure' => $element));
+ * Signal::send('attachments.wrapper',$this,$structure);
+ *
+ * @return string
+ */
 class AttachmentPreviewPlugin extends Plugin
 {
 
     var $config_class = 'AttachmentPreviewPluginConfig';
+
+    /**
+     * What signal are we going to connect to?
+     *
+     * @var unknown
+     */
+    static $signal_id = 'attachments.wrapper';
+
+    static $foreign_elements;
 
     /**
      * Required stub.
@@ -26,6 +78,21 @@ class AttachmentPreviewPlugin extends Plugin
     {
         // I'm assuming this won't get called if the plugin is disabled.
         $this->checkPermissionsAndRun();
+
+        // Assuming that other plugins want to inject an element or two..
+        // Provide a connection point to the attachments.wrapper
+        Signal::connect(self::$signal_id, function ($object, $data) {
+            // error_log("Received connection from " . get_class($object));
+            foreach ($data as $structure) {
+                // Whichever of your foreign elements matches first, that's what we use.
+                if (is_object($structure) && property_exists($structure, regex) && preg_match($structure->regex, $_SERVER['REQUEST_URI'])) {
+                    // TODO: Validate structure is valid
+                    self::$foreign_elements[get_class($object)] = $structure;
+                    // error_log("Structure accepted: " . print_r($structure,true));
+                    return; // only match the first one. right? Those regexes shouldn't match multiple URLs.
+                }
+            }
+        });
     }
 
     /**
@@ -34,6 +101,11 @@ class AttachmentPreviewPlugin extends Plugin
     public function getForm()
     {
         return array();
+    }
+
+    public function getSignalID()
+    {
+        return $this->signal_id;
     }
 
     /**
@@ -65,6 +137,13 @@ class AttachmentPreviewPlugin extends Plugin
                     // Output the buffer
                     // Check for Attachable's and print
                     print $this->findAttachableStuff(ob_get_clean());
+                });
+            } elseif (count(self::foreign_elements)) {
+                // There appears to work to do as signalled.. This would otherwise be ignored as the shutdown handler
+                // is nominally only initiated when enabled.. This allows other plugins to send it jobs. ;-)
+                ob_start();
+                register_shutdown_function(function () {
+                    print $this->doRemoteWork(ob_get_clean());
                 });
             }
         }
@@ -98,7 +177,7 @@ class AttachmentPreviewPlugin extends Plugin
             'xlsx' => 'addGoogleDocsViewer',
             'ppt' => 'addGoogleDocsViewer',
             'pptx' => 'addGoogleDocsViewer',
-            'tiff' => 'addGoogleDocsViewer',
+            'tiff' => 'addGoogleDocsViewer'
         );
         $images = array(
             'bmp' => 'addIMG',
@@ -190,7 +269,92 @@ class AttachmentPreviewPlugin extends Plugin
                 }
             }
         }
+
+        // Before we return this, let's see if any foreign_elements have been provided by other plugins, we'll insert them.
+        // This allows those plugins to edit this plugin.. seat-of-the-pants stuff!
+        if (count(self::$foreign_elements)) {
+            // Note the processRemoteElements call returns.. so, make sure you generate html!
+            return $this->processRemoteElements($doc);
+        }
+
         return $doc->saveHTML();
+    }
+
+    private function processRemoteElements(DOMDocument $dom)
+    {
+        // $this->foreign_elements should be an array of structures like:
+        /**
+         * ) * $structure = (object)[
+         * 'regex' => '/tickets\.php/', // Which pages do we operate on?
+         * 'element' => $element, // The DOMElement to replace/inject etc.
+         * 'locator' => 'tag', // EG: tag/id/xpath
+         * 'replace_found' => FALSE, // default
+         * 'expression' => 'body' // which tag/id/xpath etc.
+         * ];
+         */
+        foreach (self::$foreign_elements as $structure) {
+
+            // Validate the Structure
+            if (! property_exists($structure, 'element') || ! $structure->element instanceof DOMElement) {
+                // What?
+                error_log("Invalid or missing element.");
+                continue;
+            }
+
+            // Verify that the sender used a tag/id/xpath
+            if (! property_exists($structure, 'locator')) {
+                error_log("Invalid locator");
+                continue;
+            }
+            if (! property_exists($structure, 'replace_found')) {
+                $structure->replace_found = FALSE;
+            }
+
+            if (! property_exists($structure, 'expression')) {
+                error_log("Invalid expression");
+                continue;
+            }
+
+            if (! isset($this->foreign_elements[$type])) {
+                error_log("Invalid or missing selector.");
+                return $dom->saveHTML();
+            }
+
+            // Load the element(s) into our DOM
+            $imported_element = $dom->importNode($structure->element, true);
+
+            // Based on type of DOM Selector, lets insert this imported element.
+            switch ($structure->locator) {
+                case 'xpath':
+                    $finder = new \DOMXPath($dom);
+                    foreach ($finder->query($structure->expression) as $node) {
+                        $node->appendChild($imported_element);
+                    }
+                    break;
+                case 'id':
+                    $node = $dom->getElementById($structure->expression);
+                    $node->appendChild($imported_element);
+                    break;
+                case 'tag':
+                    foreach ($dom->getElementsByTagName($structure->expression) as $node) {
+                        $node->appendChild($imported_element);
+                    }
+                    break;
+                default:
+                    error_log("Locator {$structure->locator} has not been implemented yet.");
+                    continue;
+            }
+        }
+        return $dom->saveHTML(); // yes, we end here.
+    }
+
+    private function doRemoteWork($html)
+    {
+        // We haven't actually been asked to run our code here, but the plugin users guild want to extend the wrapper
+        // So, as a service to other plugins, we'll extend this functionality here.
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html);
+        return $this->processRemoteElements($dom);
     }
 
     /**
@@ -298,7 +462,7 @@ class AttachmentPreviewPlugin extends Plugin
         $url = $link->getAttribute('href');
         $text_element = $doc->createElement('pre');
         // Don't even bother filtering the "html", just convert everything into plain text. See how it likes that!
-        $text_element->nodeValue =  htmlentities($this->convertAttachmentUrlToFileContents($url),ENT_NOQUOTES);
+        $text_element->nodeValue = htmlentities($this->convertAttachmentUrlToFileContents($url), ENT_NOQUOTES);
         $this->wrap($doc, $link, $text_element);
     }
 
@@ -394,10 +558,12 @@ class AttachmentPreviewPlugin extends Plugin
     /**
      * Retrieve the file extension from a link element
      * It needed to be somewhere, because it's hella ugly.
+     *
      * @param DOMElement $link
      * @return string
      */
-    private function getExtension(DOMElement $link){
+    private function getExtension(DOMElement $link)
+    {
         return strtolower(substr(strrchr($link->textContent, '.'), 1));
     }
 }
