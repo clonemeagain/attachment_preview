@@ -97,7 +97,8 @@ class AttachmentPreviewPlugin extends Plugin
             'xls' => 'addGoogleDocsViewer',
             'xlsx' => 'addGoogleDocsViewer',
             'ppt' => 'addGoogleDocsViewer',
-            'pptx' => 'addGoogleDocsViewer'
+            'pptx' => 'addGoogleDocsViewer',
+            'tiff' => 'addGoogleDocsViewer',
         );
         $images = array(
             'bmp' => 'addIMG',

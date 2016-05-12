@@ -6,12 +6,15 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 
 ## Current features:
 - PDF Files attachments are embedded as full PDF `<object>` in the entry.
-- Images inserted as normal <img> tags. Supported by most browsers: `png,jpg,gif,svg,bmp`
+- Images inserted as normal `<img>` tags. Supported by most browsers: `png,jpg,gif,svg,bmp`
 - Text files attachments are inserted into using `<pre>` (If enabled). 
 - HTML files are filtered and inserted (If enabled). 
-- All modifications to the DOM are now performed on the server
+- Youtube links in comments can be used to create embedded `<iframe>` players. (if enabled)
+- HTML5 Compatible video formats attached are embedded as `<video>` players. (if enabled)
+- XLS/DOC files can be previewed inline using the Google Docs Embedded viewer. [info](http://googlesystem.blogspot.com.au/2009/09/embeddable-google-document-viewer.html)
+- All modifications to the DOM are now performed on the server.
 - Admin can choose the types of attachments to inline, and who can inline them.
-- Default admin options are embed "PDF's & Images" only for "Agents". 
+- Default admin options are embed "PDF's & Images" only for "Agents".
 
 ## To Install:
 1. Simply `git clone https://github.com/clonemeagain/attachment_preview.git /includes/plugins/attachment_preview` Or extract [latest-zip](https://github.com/clonemeagain/attachment_preview/archive/master.zip) into /includes/plugins/attachment_preview
@@ -31,7 +34,7 @@ The plugin will still be available, you have deleted the config only at this poi
 
 # How it works:
 
-It's pretty simple, when configured to work, and a tickets page is viewer, an output buffer is created on BootStrap which waits for the page to be finished rendering by osTicket.
+It's pretty simple, when configured to work, and a tickets page is viewed, an output buffer is created on BootStrap which waits for the page to be finished rendering by osTicket.
 When that's done, we flush the buffer and put the structure into a DOMDocument, pretty standard PHP so far.
 We run through the link elements of the Document, see which are Attachments.
 If we have admin permission to "inline the attachment", we add a new DOMElement after the attachments section, inlining the attachment. PDF's become `<object>`'s, PNG's become `<img>` etc. 
@@ -40,6 +43,4 @@ The plugin is self-contained, so ZERO MODS to core are required. You simply clon
 
 
 # TODO:
-- Put CSS into a file
-- I was thinking, onInstall dump the CSS into /css/ or something
-- Then onUninstall simply remove the file.. could work. Assumes web-server has write permission to the entire osTicket install though, so have simply inlined all CSS changes.
+- ??
