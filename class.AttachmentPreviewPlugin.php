@@ -169,7 +169,7 @@ class AttachmentPreviewPlugin extends Plugin
 
                 // Luckily, the attachment link contains the filename.. which we can use!
                 // Grab the extension of the file from the filename
-                $ext = strtolower(substr(strrchr($link->textContent, '.'), 1));
+                $ext = $this->getExtension($link);
 
                 // See if admin allowed this extension
                 if (! array_key_exists($ext, $allowed_extensions)) {
@@ -257,7 +257,7 @@ class AttachmentPreviewPlugin extends Plugin
         $video->setAttribute('controls', 1);
         $source = $doc->createElement('source');
         $source->setAttribute('src', $link->getAttribute('href'));
-        $source->setAttribute('type', 'video/' . strtolower(substr(strrchr($link->textContent, '.'), 1)));
+        $source->setAttribute('type', 'video/' . $this->getExtension($link));
         $video->appendChild($source);
         $this->wrap($doc, $link, $video);
     }
@@ -275,7 +275,8 @@ class AttachmentPreviewPlugin extends Plugin
             // Can't just "throw" html at some DOM, we'll need to construct a new DOM
             // And import the nodes from it into our current DOM. Wooo.
             $html_document = new \DOMDocument();
-            $html_document->loadHTML($this->convertAttachmentUrlToFileContents($url));
+            // Grab the data from the file, run it through a filter, then load it into the new DOM
+            @$html_document->loadHTML(Format::sanitize($this->convertAttachmentUrlToFileContents($url)));
             $node = $doc->importNode($html_document->documentElement, true);
             $this->wrap($doc, $link, $node);
         } catch (\Exception $e) {
@@ -296,7 +297,8 @@ class AttachmentPreviewPlugin extends Plugin
     {
         $url = $link->getAttribute('href');
         $text_element = $doc->createElement('pre');
-        $text_element->nodeValue = $this->convertAttachmentUrlToFileContents($url);
+        // Don't even bother filtering the "html", just convert everything into plain text. See how it likes that!
+        $text_element->nodeValue =  htmlentities($this->convertAttachmentUrlToFileContents($url),ENT_NOQUOTES);
         $this->wrap($doc, $link, $text_element);
     }
 
@@ -335,8 +337,7 @@ class AttachmentPreviewPlugin extends Plugin
                     $backend = $file->open();
 
                     // Load the file entirely (I imagine this is like file_get_contents, but abstracted)
-                    // Run the Sanitize function over it, preventing CSRF/XSS/ETC
-                    return Format::sanitize($backend->read());
+                    return $backend->read();
                 }
             }
         }
@@ -388,5 +389,15 @@ class AttachmentPreviewPlugin extends Plugin
             // not a youtube video
         }
         return $youtube_id;
+    }
+
+    /**
+     * Retrieve the file extension from a link element
+     * It needed to be somewhere, because it's hella ugly.
+     * @param DOMElement $link
+     * @return string
+     */
+    private function getExtension(DOMElement $link){
+        return strtolower(substr(strrchr($link->textContent, '.'), 1));
     }
 }
