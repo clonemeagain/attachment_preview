@@ -123,6 +123,13 @@ class AttachmentPreviewPlugin extends Plugin
                 $allowed_extensions = array();
         }
 
+        if($config->get('attachment-video')){
+            $allowed_extensions['mp4'] = 'addVideo';
+            $allowed_extensions['ogv'] = 'addVideo';
+            $allowed_extensions['webm'] = 'addVideo';
+            $allowed_extensions['3gp'] = 'addVideo';
+        }
+
         if (! count($allowed_extensions)) {
             // We've not been granted permission to change anything, so don't... just return original HTML.
             return $html;
@@ -163,7 +170,7 @@ class AttachmentPreviewPlugin extends Plugin
                 // This link isn't to /file.php & admin have asked us to check if it is a youtube link.
                 // The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
                 if (strpos($link->getAttribute('href'), 'youtub') !== FALSE) {
-                    $this->addVID($doc, $link);
+                    $this->addYoutube($doc, $link);
                 }
             }
         }
@@ -211,7 +218,7 @@ class AttachmentPreviewPlugin extends Plugin
      * @param DOMDocument $doc
      * @param DOMElement $link
      */
-    private function addVID(DOMDocument $doc, DOMElement $link)
+    private function addYoutube(DOMDocument $doc, DOMElement $link)
     {
         if ($youtube_id = $this->getYoutubeIdFromUrl($link->getAttribute('href')) !== FALSE) {
             // Now we can add an iframe so the video is instanly playable.
@@ -227,6 +234,16 @@ class AttachmentPreviewPlugin extends Plugin
         }
     }
 
+    private function addVideo(DOMDocument $doc, DOMElement $link){
+        $video = $doc->createElement('video');
+        $video->setAttribute('controls',1);
+        $source = $doc->createElement('source');
+        $source->setAttribute('src', $link->getAttribute('href'));
+        $source->setAttribute('type','video/' . strtolower(substr(strrchr($link->textContent, '.'), 1)));
+        $video->appendChild($source);
+        $this->wrap($doc, $link, $video);
+    }
+
     /**
      * Fetches an HTML attachment entirely, and injects it into the DOM
      *
@@ -237,12 +254,10 @@ class AttachmentPreviewPlugin extends Plugin
     {
         try {
             $url = $link->getAttribute('href');
-            $raw = $this->convertAttachmentUrlToFileContents($url);
-            $formatter = new Format();
             // Can't just "throw" html at some DOM, we'll need to construct a new DOM
             // And import the nodes from it into our current DOM. Wooo.
             $html_document = new \DOMDocument();
-            $html_document->loadHTML($formatter->safe_html($raw));
+            $html_document->loadHTML($this->convertAttachmentUrlToFileContents($url));
             $node = $doc->importNode($html_document->documentElement, true);
             $this->wrap($doc, $link, $node);
         } catch (\Exception $e) {
@@ -262,10 +277,8 @@ class AttachmentPreviewPlugin extends Plugin
     private function addTEXT(DOMDocument $doc, DOMElement $link)
     {
         $url = $link->getAttribute('href');
-        $raw = $this->convertAttachmentUrlToFileContents($url);
-        $formatter = new Format();
         $text_element = $doc->createElement('pre');
-        $text_element->nodeValue = $formatter->display($raw);
+        $text_element->nodeValue = $this->convertAttachmentUrlToFileContents($url);
         $this->wrap($doc, $link, $text_element);
     }
 
@@ -292,7 +305,8 @@ class AttachmentPreviewPlugin extends Plugin
                     $backend = $file->open();
 
                     // Load the file entirely (I imagine this is like file_get_contents, but abstracted)
-                    return $backend->read();
+                    // Run the Sanitize function over it, preventing CSRF/XSS/ETC
+                    return Format::sanitize($backend->read());
                 }
             }
         }

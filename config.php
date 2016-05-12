@@ -34,8 +34,8 @@ class AttachmentPreviewPluginConfig extends PluginConfig
             )),
 
             'attachment-video' => new BooleanField(array(
-                'label' => $__('Convert Youtube to Player'),
-                'hint' => $__("Sick of clicking links and opening videos in new windows? Watch them in the thread!")
+                'label' => $__('Convert Youtube/video to Player'),
+                'hint' => $__("Watch video attachments and YouTube in the thread! (Default HTML5 player supports mp4,webm,ogv,3gp")
             )),
 
             'attachment-allowed' => new ChoiceField(array(
