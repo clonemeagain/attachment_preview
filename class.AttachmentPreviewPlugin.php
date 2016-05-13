@@ -88,7 +88,7 @@ class AttachmentPreviewPlugin extends Plugin
         // Assuming that other plugins want to inject an element or two..
         // Provide a connection point to the attachments.wrapper
         Signal::connect(self::$signal_id, function ($object, $data) {
-            error_log("Received connection from " . get_class($object));
+            //error_log("Received connection from " . get_class($object));
 
             // We assume you've already checked the URI/permissions etc and want to edit the DOM with your structure.
             // ie: if($regex && preg_match($regex, $_SERVER['REQUEST_URI'])) {
@@ -299,7 +299,7 @@ class AttachmentPreviewPlugin extends Plugin
          * ));
          */
         foreach (self::$foreign_elements as $source => $structures) {
-            error_log("Loading remote structures from $source");
+            //error_log("Loading remote structures from $source");
             foreach ($structures as $structure) {
                 // Validate the Structure
                 try {
