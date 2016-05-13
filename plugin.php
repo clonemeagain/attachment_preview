@@ -1,5 +1,5 @@
 <?php return array(
- 'clonemeagain:attachment_preview', # notrans
+ 'id' => 'clonemeagain:attachment_preview', # notrans
  'version' => '0.2',
  'name' => 'Attachment Inline Plugin',
  'author' => 'clonemeagain@gmail.com',
