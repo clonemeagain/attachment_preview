@@ -5,15 +5,22 @@ require_once (INCLUDE_DIR . 'class.format.php');
 require_once ('config.php');
 
 /**
- * Provides in-line attachments, and an interface to the wrapper.
+ * Provides in-line attachments, and an interface to the DOM wrapper.
  *
- * Even when you don't give anyone permission to inline attachments it will still provide
+ * Even when you don't give anyone permission to use inline attachments it will still provide
  * a back-end to the DOM, allowing you to write plugins that don't have to wrap the whole DOM yourself. :-)
  *
+ * This is probably a good thing, so there isn't multiple competing DOM parsers & editors running sequentially..
+ * If that occurred, then the DOM could conceivably be created from HTML, converted to a DOMDocument, back to HTML
+ * repeatedly for every plugin that used this technique. Wanting to build several private plugins, I needed something
+ * to do this, without compromising the main functionality of this plugin.
+ *
+ * In retrospect, perhaps this should be more of a "Library" plugin.. dunno. See what people say.
+ *
+ * // NOTE: by enforcing DOMElement objects only, I don't have to do any fancy conversions on my end.
  *
  *
- *
- * Great for injecting simple things, like a script, stylesheet, single widget, element etc..
+ * It's great for injecting simple things, like a script, stylesheet, single widget, element etc..
  *
  * EG: To inject a script to the tickets pages for both agents and customers:
  * <?php
@@ -21,16 +28,18 @@ require_once ('config.php');
  * // Create the new element to inject/replace existing
  * $dom = new DOMDocument();
  * $element = $dom->createElement('script');
+ * $element->nodeContent = "var something = {type: 'Thing',}; alert('I can\'t believe that you\'ve done this!?');"; // The contents of the script.
  *
  * // Build a structure to send to the plugin with everything we should need.
  * $structure = (object)[
- * 'regex' => '/tickets\.php/', // Which pages do we operate on?
  * 'element' => $element, // The DOMElement to replace/inject etc.
  * 'locator' => 'tag', // EG: tag/id/xpath
  * 'replace_found' => FALSE, // default
+ * 'setAtribute' => array('attribute_name' => 'attribute_value'), // not set by default.
  * 'expression' => 'body' // which tag/id/xpath etc.
  * ];
- * $sendable = array($structure); // You might wish to send multiple structures.
+ * // Which pages do we operate on?
+ * $sendable = array($structure); // You might wish to send multiple structures. You can send many changes in one go
  * Signal::send('attachments.wrapper', $this, $sendable);
  * ?>
  * *
@@ -76,23 +85,18 @@ class AttachmentPreviewPlugin extends Plugin
 
     function bootstrap()
     {
-        // I'm assuming this won't get called if the plugin is disabled.
-        $this->checkPermissionsAndRun();
-
         // Assuming that other plugins want to inject an element or two..
         // Provide a connection point to the attachments.wrapper
         Signal::connect(self::$signal_id, function ($object, $data) {
-            // error_log("Received connection from " . get_class($object));
-            foreach ($data as $structure) {
-                // Whichever of your foreign elements matches first, that's what we use.
-                if (is_object($structure) && property_exists($structure, regex) && preg_match($structure->regex, $_SERVER['REQUEST_URI'])) {
-                    // TODO: Validate structure is valid
-                    self::$foreign_elements[get_class($object)] = $structure;
-                    // error_log("Structure accepted: " . print_r($structure,true));
-                    return; // only match the first one. right? Those regexes shouldn't match multiple URLs.
-                }
-            }
+            error_log("Received connection from " . get_class($object));
+
+            // We assume you've already checked the URI/permissions etc and want to edit the DOM with your structure.
+            // ie: if($regex && preg_match($regex, $_SERVER['REQUEST_URI'])) {
+            self::$foreign_elements[get_class($object)] = $data;
         });
+
+        // I'm assuming this won't get called if the plugin is disabled.
+        $this->checkPermissionsAndRun();
     }
 
     /**
@@ -125,7 +129,7 @@ class AttachmentPreviewPlugin extends Plugin
             // Check what our URI is, if acceptable, add to the output.. :-)
             // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
             // Can't go injecting this into every page.. we only want it for the actual ticket pages
-            if (preg_match('/\/tickets\.php/i', $_SERVER['REQUEST_URI'])) {
+            if ($this->isTicketsView()) {
                 // We could hack at core, or we can simply capture the whole page output and modify the HTML then..
                 // Not "easier", but less likely to break core.. right?
                 // There appears to be a few uses of ob_start in the codebase, but they stack, so it might work!
@@ -138,14 +142,14 @@ class AttachmentPreviewPlugin extends Plugin
                     // Check for Attachable's and print
                     print $this->findAttachableStuff(ob_get_clean());
                 });
-            } elseif (count(self::foreign_elements)) {
-                // There appears to work to do as signalled.. This would otherwise be ignored as the shutdown handler
-                // is nominally only initiated when enabled.. This allows other plugins to send it jobs. ;-)
-                ob_start();
-                register_shutdown_function(function () {
-                    print $this->doRemoteWork(ob_get_clean());
-                });
             }
+        } elseif (count(self::$foreign_elements)) {
+            // There appears to work to do as signalled.. This would otherwise be ignored as the shutdown handler
+            // is nominally only initiated when enabled.. This allows other plugins to send it jobs. ;-)
+            ob_start();
+            register_shutdown_function(function () {
+                print $this->doRemoteWork(ob_get_clean());
+            });
         }
     }
 
@@ -248,7 +252,7 @@ class AttachmentPreviewPlugin extends Plugin
 
                 // Luckily, the attachment link contains the filename.. which we can use!
                 // Grab the extension of the file from the filename
-                $ext = $this->getExtension($link);
+                $ext = $this->getExtension($link->textContent);
 
                 // See if admin allowed this extension
                 if (! array_key_exists($ext, $allowed_extensions)) {
@@ -273,7 +277,6 @@ class AttachmentPreviewPlugin extends Plugin
         // Before we return this, let's see if any foreign_elements have been provided by other plugins, we'll insert them.
         // This allows those plugins to edit this plugin.. seat-of-the-pants stuff!
         if (count(self::$foreign_elements)) {
-            // Note the processRemoteElements call returns.. so, make sure you generate html!
             return $this->processRemoteElements($doc);
         }
 
@@ -284,68 +287,111 @@ class AttachmentPreviewPlugin extends Plugin
     {
         // $this->foreign_elements should be an array of structures like:
         /**
-         * ) * $structure = (object)[
-         * 'regex' => '/tickets\.php/', // Which pages do we operate on?
+         * array('sourceClassName' => array(
+         * (object)[
          * 'element' => $element, // The DOMElement to replace/inject etc.
          * 'locator' => 'tag', // EG: tag/id/xpath
          * 'replace_found' => FALSE, // default
+         * 'setAttribute' => array('attribute_name' => 'attribute_value'), // Not included by default, but great for adding tiny customizations.
          * 'expression' => 'body' // which tag/id/xpath etc.
-         * ];
+         * ],
+         * (object2)[], etc.
+         * ));
          */
-        foreach (self::$foreign_elements as $structure) {
-
-            // Validate the Structure
-            if (! property_exists($structure, 'element') || ! $structure->element instanceof DOMElement) {
-                // What?
-                error_log("Invalid or missing element.");
-                continue;
-            }
-
-            // Verify that the sender used a tag/id/xpath
-            if (! property_exists($structure, 'locator')) {
-                error_log("Invalid locator");
-                continue;
-            }
-            if (! property_exists($structure, 'replace_found')) {
-                $structure->replace_found = FALSE;
-            }
-
-            if (! property_exists($structure, 'expression')) {
-                error_log("Invalid expression");
-                continue;
-            }
-
-            if (! isset($this->foreign_elements[$type])) {
-                error_log("Invalid or missing selector.");
-                return $dom->saveHTML();
-            }
-
-            // Load the element(s) into our DOM
-            $imported_element = $dom->importNode($structure->element, true);
-
-            // Based on type of DOM Selector, lets insert this imported element.
-            switch ($structure->locator) {
-                case 'xpath':
-                    $finder = new \DOMXPath($dom);
-                    foreach ($finder->query($structure->expression) as $node) {
-                        $node->appendChild($imported_element);
+        foreach (self::$foreign_elements as $source => $structures) {
+            error_log("Loading remote structures from $source");
+            foreach ($structures as $structure) {
+                // Validate the Structure
+                try {
+                    if (! is_object($structure)) {
+                        continue; // just skip this fail.
                     }
-                    break;
-                case 'id':
-                    $node = $dom->getElementById($structure->expression);
-                    $node->appendChild($imported_element);
-                    break;
-                case 'tag':
-                    foreach ($dom->getElementsByTagName($structure->expression) as $node) {
-                        $node->appendChild($imported_element);
+
+                    if (! property_exists($structure, 'setAttribute') && (! property_exists($structure, 'element') || ! is_object($structure->element) || ! $structure->element instanceof DOMElement)) {
+                        // What?
+                        throw new \Exception("Invalid or missing parameter 'element' from source {$source}.");
                     }
-                    break;
-                default:
-                    error_log("Locator {$structure->locator} has not been implemented yet.");
-                    continue;
+
+                    // Verify that the sender used a tag/id/xpath
+                    if (! property_exists($structure, 'locator')) {
+                        throw new \Exception("Invalid or missing locator");
+                    }
+                    if (! property_exists($structure, 'replace_found')) {
+                        $structure->replace_found = FALSE;
+                    }
+
+                    if (! property_exists($structure, 'expression')) {
+                        throw new \Exception("Invalid or missing expression");
+                    }
+
+                    // Load the element(s) into our DOM, we can't insert them until then.
+                    if (! property_exists($structure, 'setAttribute')) {
+                        // we aren't just changing an attribute, we are inserting new or replacing.
+                        $imported_element = $dom->importNode($structure->element, true);
+                    }
+
+                    // Based on type of DOM Selector, lets insert this imported element.
+                    switch ($structure->locator) {
+                        case 'xpath':
+                            $finder = new \DOMXPath($dom);
+                            $test = 0;
+                            foreach ($finder->query($structure->expression) as $node) {
+                                $test ++;
+                                $this->update($node, $structure, $imported_element);
+                            }
+                            if (! $test) {
+                                throw new Exception("Nothing matched: {$structure->expression}");
+                            }
+                            break;
+                        case 'id':
+                            // Note, ID doesn't mean jQuery $('#id'); usefulness.. its xml:id="something", which none of our docs will have.
+                            $finder = new \DOMXPath($dom);
+                            $node = $finder->query("//*[@id='{$structure->expression}']")->item(0);
+                            if (! $node) {
+                                $this->log('Unable to find node with expression {$structure->expression}');
+                                continue;
+                            }
+                            $this->update($node, $structure, $imported_element);
+                            break;
+                        case 'tag':
+                            foreach ($dom->getElementsByTagName($structure->expression) as $node) {
+                                $this->update($node, $structure, $imported_element);
+                            }
+                            break;
+                        default:
+                            $this->log('Invalid Locator specification', "Your locator from {$source} is invalid, {$structure->locator} has not been implemented. Available options are: xpath,id,tag");
+                            continue;
+                    }
+                } catch (\Exception $de) {
+                    $msg = $de->getMessage() . print_r($structure, true);
+                    $this->log("{$source} triggered DOM error", $msg);
+                }
             }
         }
         return $dom->saveHTML(); // yes, we end here.
+    }
+
+    private function update(\DOMElement $node, $structure, \DOMElement $imported_element = null)
+    {
+        if ($structure->replace_found) {
+            $node->parentNode->replaceChild($node, $imported_element);
+        } elseif ($structure->setAttribute) {
+            foreach ($structure->setAttribute as $key => $val) {
+                $node->setAttribute($key, $val);
+            }
+        } else {
+            $node->appendChild($imported_element);
+        }
+    }
+
+    private function log($title, $text = null)
+    {
+        // Log to system.
+        global $ost;
+        if (! $text) {
+            $text = $title;
+        }
+        $ost->logWarning($title, $text);
     }
 
     private function doRemoteWork($html)
@@ -421,7 +467,7 @@ class AttachmentPreviewPlugin extends Plugin
         $video->setAttribute('controls', 1);
         $source = $doc->createElement('source');
         $source->setAttribute('src', $link->getAttribute('href'));
-        $source->setAttribute('type', 'video/' . $this->getExtension($link));
+        $source->setAttribute('type', 'video/' . $this->getExtension($link->textContent));
         $video->appendChild($source);
         $this->wrap($doc, $link, $video);
     }
@@ -562,8 +608,29 @@ class AttachmentPreviewPlugin extends Plugin
      * @param DOMElement $link
      * @return string
      */
-    private function getExtension(DOMElement $link)
+    public static function getExtension($string)
     {
-        return strtolower(substr(strrchr($link->textContent, '.'), 1));
+        return strtolower(substr(strrchr($string, '.'), 1));
+    }
+
+    /**
+     * We only want to inject when viewing tickets, not when EDITING tickets..
+     * or any other view.
+     *
+     * Available statically via: AttachmentPreviewPlugin::isTicketsView()
+     *
+     * @return bool whether or not current page is viewing a ticket.
+     */
+    public static function isTicketsView()
+    {
+        // This ensures no matter how many plugins call this function, it only checks it once.
+        static $result;
+        // Matches /support/scp/tickets.php?id=12345 etc, as well as
+        // /support/scp/tickets.php?id=12345#reply
+        // BUT NOT /support/scp/tickets.php?id=12345&a=edit
+        if (! isset($result)) {
+            $result = (preg_match('/\/tickets\.php(\?id=[\d]+)?(#[a-z]+)?(&_pjax.*)?$/i', $_SERVER['REQUEST_URI']));
+        }
+        return $result;
     }
 }
