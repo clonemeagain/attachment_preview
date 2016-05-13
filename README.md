@@ -34,14 +34,17 @@ The plugin will still be available, you have deleted the config only at this poi
 
 
 # How it works:
+Latest in [Wiki](https://github.com/clonemeagain/attachment_preview/wiki)
 
-It's pretty simple, when configured to work, and a tickets page is viewed, an output buffer is created on BootStrap which waits for the page to be finished rendering by osTicket.
-When that's done, we flush the buffer and put the structure into a DOMDocument, pretty standard PHP so far.
-We run through the link elements of the Document, see which are Attachments.
-If we have admin permission to "inline the attachment", we add a new DOMElement after the attachments section, inlining the attachment. PDF's become `<object>`'s, PNG's become `<img>` etc. 
+* Essentially it's simple, when enabled, and a ticket page is viewed, an output buffer is created on osTicket BootStrap which waits for the page to be finished rendering by osTicket. (Using php's register_shutdown_function & ob_start)
+* When that's done, we fetch the output buffer and convert the HTML structure into a DOMDocument, pretty standard PHP so far.
+* The plugin then runs through the link elements of the Document, to find all Attachments.
+* It then adds a new DOMElement after the attachments section, inlining each attachment. PDF's become `<object>`'s, PNG's become `<img>` etc. 
 Tested and works on 1.8-git. SHOULD work on future versions, depending on how the files are attached.. haven't tested on anything else though, let me know! 
+
 The plugin is self-contained, so ZERO MODS to core are required. You simply clone the repo or download the zip from github and extract into /includes/plugins/ which should make a folder: "attachment_preview", but it could be called anything. 
 
 
 # TODO:
 - ??
+- You tell me!
