@@ -17,7 +17,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig
                 }
             );
         }
-        return Plugin::translate('pdf_preview');
+        return Plugin::translate('attachment_preview');
     }
 
     /**
