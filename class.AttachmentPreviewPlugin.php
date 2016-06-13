@@ -624,13 +624,22 @@ class AttachmentPreviewPlugin extends Plugin
     public static function isTicketsView()
     {
         // This ensures no matter how many plugins call this function, it only checks it once.
-        static $result;
-        // Matches /support/scp/tickets.php?id=12345 etc, as well as
-        // /support/scp/tickets.php?id=12345#reply
-        // BUT NOT /support/scp/tickets.php?id=12345&a=edit
-        if (! isset($result)) {
-            $result = (preg_match('/\/tickets\.php(\?id=[\d]+)?(#[a-z]+)?(&_pjax.*)?$/i', $_SERVER['REQUEST_URI']));
-        }
-        return $result;
+        static $tickets_view;
+
+        // Only set the $tickets_view if we've not set it (Will not last beyond each page anyway, but you never know, I call this from my plugins too)
+        if (! isset($tickets_view)) {
+			if (count ( $_POST ) > 0) {
+				// If something has been POST'd to osTicket, we don't want any part of that. 
+				// We're obviously not just "Viewing" a ticket if we've posted something, you only post to change!
+				// Resolves issue #3 regarding printing of tickets. 
+				$tickets_view = FALSE;
+			} else {
+				// Matches /support/scp/tickets.php?id=12345 etc, as well as
+				// /support/scp/tickets.php?id=12345#reply
+				// BUT NOT /support/scp/tickets.php?id=12345&a=edit
+				$tickets_view = (preg_match ( '/\/tickets\.php(\?id=[\d]+)?(#[a-z]+)?(&_pjax.*)?$/i', $_SERVER ['REQUEST_URI'] ));
+			}
+		}
+        return $tickets_view;
     }
 }
