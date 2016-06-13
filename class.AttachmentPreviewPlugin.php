@@ -628,7 +628,7 @@ class AttachmentPreviewPlugin extends Plugin
 
         // Only set the $tickets_view if we've not set it (Will not last beyond each page anyway, but you never know, I call this from my plugins too)
         if (! isset($tickets_view)) {
-			if (count ( $_POST ) > 0) {
+			if (isset($_POST) && count ( $_POST ) > 0) {
 				// If something has been POST'd to osTicket, we don't want any part of that. 
 				// We're obviously not just "Viewing" a ticket if we've posted something, you only post to change!
 				// Resolves issue #3 regarding printing of tickets. 
