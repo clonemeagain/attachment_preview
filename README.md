@@ -13,7 +13,7 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 - HTML5 Compatible video formats attached are embedded as `<video>` players. (if enabled)
 - XLS/DOC files can be previewed inline using the Google Docs Embedded viewer. [info](http://googlesystem.blogspot.com.au/2009/09/embeddable-google-document-viewer.html)
 - All modifications to the DOM are now performed on the server.
-- Admin can choose the types of attachments to inline, and who can inline them.
+- Admin can choose the types of attachments to inline, and who can inline them, when viewing tickets OR KB Articles.
 - Default admin options are embed "PDF's & Images" only for "Agents".
 - Plugin API: allows other plugins to manipulate the DOM without adding race conditions or multiple reparses.
 

@@ -661,7 +661,7 @@ class AttachmentPreviewPlugin extends Plugin {
 				$kb_view = FALSE;
 			} else {
 				// Matches /support/scp/faq.php?id=12345 etc &  /support/faq.php
-				$kb_view = (preg_match ( '/\/faq\.php(\?id=[\d]+)$/i', $_SERVER ['REQUEST_URI'] ));
+				$kb_view = (preg_match ( '/\/faq\.php(\?id=[\d]+)?(&_pjax.*)?$/i', $_SERVER ['REQUEST_URI'] ));
 			}
 		}
 		return $kb_view;
