@@ -64,8 +64,9 @@ class AttachmentPreviewPlugin extends Plugin {
 	 *
 	 * @var unknown
 	 */
-	static $signal_id = 'attachments.wrapper';
+	const signal_id = 'attachments.wrapper';
 	static $foreign_elements;
+	const DEBUG = FALSE;
 	
 	/**
 	 * Required stub.
@@ -81,8 +82,9 @@ class AttachmentPreviewPlugin extends Plugin {
 	function bootstrap() {
 		// Assuming that other plugins want to inject an element or two..
 		// Provide a connection point to the attachments.wrapper
-		Signal::connect ( self::$signal_id, function ($object, $data) {
-			// error_log("Received connection from " . get_class($object));
+		Signal::connect ( self::signal_id, function ($object, $data) {
+			if (self::DEBUG)
+				error_log ( "Received connection from " . get_class ( $object ) );
 			
 			// We assume you've already checked the URI/permissions etc and want to edit the DOM with your structure.
 			// ie: if($regex && preg_match($regex, $_SERVER['REQUEST_URI'])) {
@@ -91,6 +93,8 @@ class AttachmentPreviewPlugin extends Plugin {
 		
 		// I'm assuming this won't get called if the plugin is disabled.
 		$this->checkPermissionsAndRun ();
+		if (self::DEBUG)
+			error_log ( "Attachments Plugin Active." );
 	}
 	
 	/**
@@ -100,7 +104,7 @@ class AttachmentPreviewPlugin extends Plugin {
 		return array ();
 	}
 	public function getSignalID() {
-		return $this->signal_id;
+		return self::signal_id;
 	}
 	
 	/**
@@ -131,6 +135,13 @@ class AttachmentPreviewPlugin extends Plugin {
 					// Output the buffer
 					// Check for Attachable's and print
 					print $this->findAttachableStuff ( ob_get_clean () );
+				} );
+			} elseif (count ( self::$foreign_elements )) {
+				// There appears to work to do as signalled.. This would otherwise be ignored as the shutdown handler
+				// is nominally only initiated when enabled.. This allows other plugins to send it jobs. ;-)
+				ob_start ();
+				register_shutdown_function ( function () {
+					print $this->doRemoteWork ( ob_get_clean () );
 				} );
 			}
 		} elseif (count ( self::$foreign_elements )) {
@@ -289,7 +300,8 @@ class AttachmentPreviewPlugin extends Plugin {
 		 * ));
 		 */
 		foreach ( self::$foreign_elements as $source => $structures ) {
-			// error_log("Loading remote structures from $source");
+			if (self::DEBUG)
+				error_log ( "Loading remote structures from $source" );
 			foreach ( $structures as $structure ) {
 				// Validate the Structure
 				try {
@@ -323,6 +335,7 @@ class AttachmentPreviewPlugin extends Plugin {
 					// Based on type of DOM Selector, lets insert this imported element.
 					switch ($structure->locator) {
 						case 'xpath' :
+							// TODO: Fix this.. doesn't seem to work
 							$finder = new \DOMXPath ( $dom );
 							$test = 0;
 							foreach ( $finder->query ( $structure->expression ) as $node ) {
@@ -353,7 +366,7 @@ class AttachmentPreviewPlugin extends Plugin {
 							continue;
 					}
 				} catch ( \Exception $de ) {
-					$msg = $de->getMessage () . print_r ( $structure, true );
+					$msg = $de->getMessage ();
 					$this->log ( "{$source} triggered DOM error", $msg );
 				}
 			}
@@ -394,10 +407,10 @@ class AttachmentPreviewPlugin extends Plugin {
 	 * @param DOMElement $link        	
 	 */
 	private function addIMG(DOMDocument $doc, DOMElement $link) {
-
+		
 		// Rebuild the download link as a normal clickable link, for full-size viewing:
-		$a = $doc->createElement('a');
-		$a->setAttribute('href', $link->getAttribute('href'));
+		$a = $doc->createElement ( 'a' );
+		$a->setAttribute ( 'href', $link->getAttribute ( 'href' ) );
 		
 		// Build an image of the referenced file, so we can simply preview it:
 		$img = $doc->createElement ( 'img' );
@@ -405,10 +418,10 @@ class AttachmentPreviewPlugin extends Plugin {
 		$img->setAttribute ( 'style', 'max-width: 100%' );
 		
 		// Put the image inside the link, so the image is clickable (opens in new tab):
-		$a->appendChild($img);
+		$a->appendChild ( $img );
 		
 		// Add a title attribute to the download link:
-		$link->setAttribute('title', 'Download this image.');
+		$link->setAttribute ( 'title', 'Download this image.' );
 		
 		$this->wrap ( $doc, $link, $a );
 	}
@@ -435,8 +448,10 @@ class AttachmentPreviewPlugin extends Plugin {
 			$fix_css = true;
 			// Create the new element to inject/replace existing
 			$css = $doc->createElement ( 'style' );
-			$css->nodeValue = '.thread-body span.attachment-info { width: 100%; height: auto; }';
-			
+			$css->nodeValue = '
+/* Plugin: Attachment Preview PDF Stylesheet */
+.thread-body span.attachment-info { width: 100%; height: auto; }
+';
 			$doc->appendChild ( $css );
 		}
 	}
