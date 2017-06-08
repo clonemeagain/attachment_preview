@@ -67,6 +67,7 @@ class AttachmentPreviewPlugin extends Plugin {
 	const signal_id = 'attachments.wrapper';
 	static $foreign_elements;
 	const DEBUG = FALSE;
+	private $kb = FALSE;
 	
 	/**
 	 * Required stub.
@@ -120,10 +121,16 @@ class AttachmentPreviewPlugin extends Plugin {
 				'staff',
 				'all' 
 		) )) {
+			$this->kb = $config->get ( 'attachment-enabled-kb' ) && $this->isKBView ();
+			
+			if($this->kb){
+				print "<h1>YAY: KB page</h1>";
+			}
+			
 			// Check what our URI is, if acceptable, add to the output.. :-)
 			// Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
-			// Can't go injecting this into every page.. we only want it for the actual ticket pages
-			if ($this->isTicketsView ()) {
+			// Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
+			if ($this->isTicketsView () || $this->kb) {
 				// We could hack at core, or we can simply capture the whole page output and modify the HTML then..
 				// Not "easier", but less likely to break core.. right?
 				// There appears to be a few uses of ob_start in the codebase, but they stack, so it might work!
@@ -245,10 +252,11 @@ class AttachmentPreviewPlugin extends Plugin {
 			// Check that the link even points to our attachment datasource
 			if (preg_match ( '/file\.php/', $link->getAttribute ( 'href' ) )) {
 				
-				// Validate that the link is actually an attachment, it should have "file" class..
-				if (strpos ( $link->getAttribute ( 'class' ), 'file' ) == FALSE) {
-					continue;
-				}
+				// Validate that the link is actually an attachment, it should have "file" class.. or "filename" in 1.10+
+				// This doesn't work for knowledgebase articles.
+				// if (strpos ( $link->getAttribute ( 'class' ), 'file' ) == FALSE) {
+				//	 continue;
+				// }
 				
 				// Luckily, the attachment link contains the filename.. which we can use!
 				// Grab the extension of the file from the filename
@@ -441,19 +449,19 @@ class AttachmentPreviewPlugin extends Plugin {
 		$message = $doc->createElement ( 'b' );
 		$message->nodeValue = "Your browser is unable to display this PDF.";
 		$pdf->appendChild ( $message );
-		$this->wrap ( $doc, $link, $pdf );
+
 		
-		static $fix_css = false;
-		if (! $fix_css) {
-			$fix_css = true;
+		static $fix_css;
+		if (! isset($fix_css)) {
+			$fix_css = TRUE;
 			// Create the new element to inject/replace existing
 			$css = $doc->createElement ( 'style' );
-			$css->nodeValue = '
-/* Plugin: Attachment Preview PDF Stylesheet */
-.thread-body span.attachment-info { width: 100%; height: auto; }
-';
-			$doc->appendChild ( $css );
+			$css->setAttribute('name', 'Plugin: Attachment Preview PDF Stylesheet');
+			$css->nodeValue = '.thread-body span.attachment-info { width: 100%; height: auto; }';
+			$pdf->appendChild ( $css );
 		}
+		
+		$this->wrap ( $doc, $link, $pdf );
 	}
 	
 	/**
@@ -645,9 +653,34 @@ class AttachmentPreviewPlugin extends Plugin {
 				// Matches /support/scp/tickets.php?id=12345 etc, as well as
 				// /support/scp/tickets.php?id=12345#reply
 				// BUT NOT /support/scp/tickets.php?id=12345&a=edit
-				$tickets_view = (preg_match ( '/\/tickets\.php(\?id=[\d]+)?(#[a-z]+)?(&_pjax.*)?$/i', $_SERVER ['REQUEST_URI'] ));
+				$tickets_view = (preg_match ( '/scp\/(index|tickets)\.php(\?id=[\d]+)?(#[a-z_]+)?(?:&_pjax.*)?(?!&a=edit)?(\?status=[a-z]+)?$/i', $_SERVER ['REQUEST_URI'] ));
 			}
 		}
 		return $tickets_view;
+	}
+	
+	/**
+	 * Determine if we are viewing a KnowledgeBase article.
+	 *
+	 * Available statically via: AttachmentPreviewPlugin::isKBView()
+	 *
+	 * @return bool whether or not current page is viewing a KB.
+	 */
+	public static function isKBView() {
+		// This ensures no matter how many plugins call this function, it only checks it once.
+		static $kb_view;
+		
+		// Only set the $kb_view if we've not set it (Will not last beyond each page anyway, but you never know, I call this from my plugins too)
+		if (! isset ( $kb_view )) {
+			if (isset ( $_POST ) && count ( $_POST ) > 0) {
+				// If something has been POST'd to osTicket, we don't want any part of that.
+				// We're obviously not just "Viewing" a kb if we've posted something, you only post to change!
+				$kb_view = FALSE;
+			} else {
+				// Matches /support/scp/faq.php?id=12345 etc & /support/faq.php
+				$kb_view = (preg_match ( '/\/faq\.php(\?id=[\d]+)?(?!&_pjax.*)(?!edit)$/i', $_SERVER ['REQUEST_URI'] ));
+			}
+		}
+		return $kb_view;
 	}
 }
