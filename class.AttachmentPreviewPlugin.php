@@ -123,7 +123,7 @@ class AttachmentPreviewPlugin extends Plugin {
 		) )) {
 			$this->kb = $config->get ( 'attachment-enabled-kb' ) && $this->isKBView ();
 			
-			if($this->kb){
+			if ($this->kb) {
 				print "<h1>YAY: KB page</h1>";
 			}
 			
@@ -202,12 +202,18 @@ class AttachmentPreviewPlugin extends Plugin {
 				'txt' => 'addTEXT',
 				'html' => 'addHTML' 
 		);
+		
+		$audio = array(
+				'wav' => 'addAudio',
+				'mp3' => 'addAudio',	
+		);
+		
 		$allowed_extensions = array ();
 		
 		// Merge the arrays together as per instruction..
 		switch ($config->get ( 'attachment-allowed' )) {
 			case 'all' :
-				$allowed_extensions = $higher_risk + $pdf + $images + $office;
+				$allowed_extensions = $higher_risk + $pdf + $images + $office + $audio;
 				break;
 			case 'pdf' :
 				$allowed_extensions = $pdf;
@@ -255,7 +261,7 @@ class AttachmentPreviewPlugin extends Plugin {
 				// Validate that the link is actually an attachment, it should have "file" class.. or "filename" in 1.10+
 				// This doesn't work for knowledgebase articles.
 				// if (strpos ( $link->getAttribute ( 'class' ), 'file' ) == FALSE) {
-				//	 continue;
+				// continue;
 				// }
 				
 				// Luckily, the attachment link contains the filename.. which we can use!
@@ -449,14 +455,13 @@ class AttachmentPreviewPlugin extends Plugin {
 		$message = $doc->createElement ( 'b' );
 		$message->nodeValue = "Your browser is unable to display this PDF.";
 		$pdf->appendChild ( $message );
-
 		
 		static $fix_css;
-		if (! isset($fix_css)) {
+		if (! isset ( $fix_css )) {
 			$fix_css = TRUE;
 			// Create the new element to inject/replace existing
 			$css = $doc->createElement ( 'style' );
-			$css->setAttribute('name', 'Plugin: Attachment Preview PDF Stylesheet');
+			$css->setAttribute ( 'name', 'Plugin: Attachment Preview PDF Stylesheet' );
 			$css->nodeValue = '.thread-body span.attachment-info { width: 100%; height: auto; }';
 			$pdf->appendChild ( $css );
 		}
@@ -487,6 +492,28 @@ class AttachmentPreviewPlugin extends Plugin {
 			$this->wrap ( $doc, $link, $player );
 		}
 	}
+	/**
+	 * Converts a linked audio file into an embedded HTML5 player.
+	 *
+	 * @param DOMDocument $doc
+	 * @param DOMElement $link
+	 */
+	private function addAudio(DOMDocument $doc, DOMElement $link) {
+		$audio = $doc->createElement ( 'audio' );
+		//$audio->setAttribute('autoplay','false');
+		//$audio->setAttribute('loop','false');
+		$audio->setAttribute('preload','auto');
+		$audio->setAttribute ( 'controls', 1 );
+		$audio->setAttribute ( 'src', $link->getAttribute ( 'href' ) );
+		$this->wrap ( $doc, $link, $audio );
+	}
+	
+	/**
+	 * Converts a linked video file into an embedded HTML5 player.
+	 *
+	 * @param DOMDocument $doc        	
+	 * @param DOMElement $link        	
+	 */
 	private function addVideo(DOMDocument $doc, DOMElement $link) {
 		$video = $doc->createElement ( 'video' );
 		$video->setAttribute ( 'controls', 1 );
@@ -534,6 +561,13 @@ class AttachmentPreviewPlugin extends Plugin {
 		$text_element->nodeValue = htmlentities ( $this->convertAttachmentUrlToFileContents ( $url ), ENT_NOQUOTES );
 		$this->wrap ( $doc, $link, $text_element );
 	}
+	
+	/**
+	 * Attempts to inject a google-doc-viewer iframe for an attached file
+	 *
+	 * @param DOMDocument $doc        	
+	 * @param DOMElement $link        	
+	 */
 	private function addGoogleDocViewer(DOMDocument $doc, DOMElement $link) {
 		// Recreate something like: <iframe style="width: 900px; height: 900px;" src="http://docs.google.com/gview?url=urltoyourworddocument&embedded=true" height="240" width="320" frameborder="0"></iframe>
 		$gdoc = $doc->createElement ( 'iframe' );
@@ -620,14 +654,13 @@ class AttachmentPreviewPlugin extends Plugin {
 	}
 	
 	/**
-	 * Retrieve the file extension from a link element
-	 * It needed to be somewhere, because it's hella ugly.
+	 * Retrieve the file extension from a string in lowercase
 	 *
 	 * @param DOMElement $link        	
 	 * @return string
 	 */
 	public static function getExtension($string) {
-		return strtolower ( substr ( strrchr ( $string, '.' ), 1 ) );
+		return strtolower ( pathinfo ( $string, PATHINFO_EXTENSION ) );
 	}
 	
 	/**
@@ -653,7 +686,7 @@ class AttachmentPreviewPlugin extends Plugin {
 				// Matches /support/scp/tickets.php?id=12345 etc, as well as
 				// /support/scp/tickets.php?id=12345#reply
 				// BUT NOT /support/scp/tickets.php?id=12345&a=edit
-				$tickets_view = (preg_match ( '/scp\/(index|tickets)\.php(\?id=[\d]+)?(#[a-z_]+)?(?:&_pjax.*)?(?!&a=edit)?(\?status=[a-z]+)?$/i', $_SERVER ['REQUEST_URI'] ));
+				$tickets_view = (preg_match ( '/scp\/(?:(index|tickets)\.php)?(\?id=[\d]+)?(#[a-z_]+)?(?!&a=edit)?(\?status=[a-z]+)?((\?|\&)p=[1-9]+)?(?:&_pjax.*)?$/i', $_SERVER ['REQUEST_URI'] ));
 			}
 		}
 		return $tickets_view;
