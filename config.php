@@ -30,6 +30,10 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
 				'attachment' => new SectionBreakField ( array (
 						'label' => $__ ( 'Attachment Inliner' ) 
 				) ),
+				'coerce-pdf' => new BooleanField ( array (
+						'label' => $__ ( 'Force PDF attachment mime' ),
+						'hint' => $__ ( 'Forces PDF files to have the correct application/pdf mimetype in the database.' ) 
+				) ),
 				
 				'attachment-video' => new BooleanField ( array (
 						'label' => $__ ( 'Convert Youtube/video to Player' ),
@@ -39,7 +43,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
 				'attachment-allowed' => new ChoiceField ( array (
 						'label' => $__ ( 'Choose the types of attachments to inline.' ),
 						'default' => 'pdf-image',
-						'hint' => $__ ( "While HTML and Text documents are filtered before being inserted in the DOM, there is always a chance this is riskier than necessary, Has no effect if txt & html extensions are not allowed to be attached in the first place. ALL also includes a Google Docs viewer for docx/xls etc files." ),
+						'hint' => $__ ( "While HTML and Text documents are filtered before being inserted in the DOM, there is always a chance this is riskier than necessary, Has no effect if txt & html extensions are not allowed to be attached in the first place." ),
 						'choices' => array (
 								'none' => $__ ( 'Safest: OFF' ),
 								'pdf' => $__ ( 'PDF Only' ),
@@ -55,13 +59,13 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
 						'hint' => 'Who needs access to these embedded fields?',
 						'choices' => array (
 								'disabled' => $__ ( 'Disabled' ),
-								'staff' => $__ ( 'Agents Only' ),
-								'all' => $__ ( 'Agents & Customers' ) 
+								'staff' => $__ ( 'Agents Only' ) 
+							// 'all' => $__ ( 'Agents & Customers' )
 						) 
-				) ),
-				'attachment-enabled-kb' => new Booleanfield ( array (
-						'label' => $__ ( 'Display inline for Knowledgebase Articles as well.' ) 
 				) ) 
+			// 'attachment-enabled-kb' => new Booleanfield ( array (
+			// 'label' => $__ ( 'Display inline for Knowledgebase Articles as well.' )
+			// ) )
 		);
 	}
 }

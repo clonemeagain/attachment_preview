@@ -81,6 +81,8 @@ class AttachmentPreviewPlugin extends Plugin {
 		parent::uninstall ( $errors );
 	}
 	function bootstrap() {
+		$config = $this->getConfig ();
+		
 		// Assuming that other plugins want to inject an element or two..
 		// Provide a connection point to the attachments.wrapper
 		Signal::connect ( self::signal_id, function ($object, $data) {
@@ -96,6 +98,17 @@ class AttachmentPreviewPlugin extends Plugin {
 		$this->checkPermissionsAndRun ();
 		if (self::DEBUG)
 			error_log ( "Attachments Plugin Active." );
+		
+		if ($config->get ( 'coerce-pdf' )) {
+			// Need to ensure attachments are saved with the correct mime-type. For some reason, a lot of my PDF's are coming through as octet-streams.. not useful.
+			Signal::connect ( 'ticket.created', function ($ticket, $data) {
+				// Find any attachments for this ticket
+				// See if any of them are PDF's
+				// Change the mimetype saved for that attachment..
+				db_query ( "update " . FILE_TABLE . " SET type = 'application/pdf' WHERE name like '%.pdf' and type like '%octet-stream'" );
+				// Well, it's a bit brutal the first time, but after that, should be quick.. :-)
+			} );
+		}
 	}
 	
 	/**
@@ -184,6 +197,7 @@ class AttachmentPreviewPlugin extends Plugin {
 		$office = array (
 				'doc' => 'addGoogleDocsViewer',
 				'docx' => 'addGoogleDocsViewer',
+				// 'csv' => 'addGoogleDocsViewer',
 				'xls' => 'addGoogleDocsViewer',
 				'xlsx' => 'addGoogleDocsViewer',
 				'ppt' => 'addGoogleDocsViewer',
@@ -199,6 +213,7 @@ class AttachmentPreviewPlugin extends Plugin {
 				'jpeg' => 'addIMG' 
 		);
 		$higher_risk = array (
+				'csv' => 'addTEXT',
 				'txt' => 'addTEXT',
 				'html' => 'addHTML' 
 		);
@@ -450,13 +465,13 @@ class AttachmentPreviewPlugin extends Plugin {
 		$pdf = $doc->createElement ( 'object' );
 		$pdf->setAttribute ( 'width', '100%' );
 		$pdf->setAttribute ( 'height', '1000px' );
-		$pdf->setAttribute ( 'data', $link->getAttribute ( 'href' ) );
+		$pdf->setAttribute ( 'data', $link->getAttribute ( 'href' ) . '&disposition=inline' );
 		$pdf->setAttribute ( 'type', 'application/pdf' );
 		
 		$emb = $doc->createElement ( 'embed' );
 		$emb->setAttribute ( 'width', '100%' );
 		$emb->setAttribute ( 'height', '1000px' );
-		$emb->setAttribute ( 'src', $link->getAttribute ( 'href' ) );
+		$emb->setAttribute ( 'src', $link->getAttribute ( 'href' ) . '&disposition=inline' );
 		$emb->setAttribute ( 'type', 'application/pdf' );
 		$pdf->appendChild ( $emb ); // for lower class browsers..
 		
@@ -542,8 +557,8 @@ class AttachmentPreviewPlugin extends Plugin {
 		
 		// The files are getting complex to parse manually.. and need to be downloaded by the browser to display anyway,
 		// let's just try a wee script to pull them?
-		// It's a bit messy, but the first script is only included once.. and it is used to prevent some XSS type attacks.. 
-		// wouldn't want an html attachment to break everything.. 
+		// It's a bit messy, but the first script is only included once.. and it is used to prevent some XSS type attacks..
+		// wouldn't want an html attachment to break everything..
 		static $trim_func;
 		if (! $trim_func) {
 			$trim_func = TRUE;
@@ -591,7 +606,7 @@ HANDSANITIZER;
 		$url = $link->getAttribute ( 'href' );
 		$id = md5 ( $url );
 		$s = $doc->createElement ( 'script' );
-		$s->setAttribute('name','Attachment Fetching Script..');
+		$s->setAttribute ( 'name', 'Attachment Fetching Script..' );
 		
 		// Find the parent of itself and replace it's contents (ie, this script) with the remote HTML file's code, after removing most of the cruft/dangerzone stuff:
 		$s->nodeValue = '$(document).ready(function(){$.get("' . $url . '",function(data){$("#' . $id . '").html($("<div>" + $.trim(sanitizer.sanitize(data)) + "</div>"));});});';
@@ -642,7 +657,7 @@ HANDSANITIZER;
 		$pre = $doc->createElement ( 'pre' );
 		$pre->setAttribute ( 'id', $id );
 		$pre->appendChild ( $s );
-		$this->wrap ( $doc, $link, $pre);
+		$this->wrap ( $doc, $link, $pre );
 		
 		return;
 		
@@ -658,10 +673,14 @@ HANDSANITIZER;
 	/**
 	 * Attempts to inject a google-doc-viewer iframe for an attached file
 	 *
+	 * Doesn't actually work, because the request uses the session to validate the user.. :-(
+	 *
+	 * Nice idea though
+	 *
 	 * @param DOMDocument $doc        	
 	 * @param DOMElement $link        	
 	 */
-	private function addGoogleDocViewer(DOMDocument $doc, DOMElement $link) {
+	private function disabled_addGoogleDocsViewer(DOMDocument $doc, DOMElement $link) {
 		// Recreate something like: <iframe style="width: 900px; height: 900px;" src="http://docs.google.com/gview?url=urltoyourworddocument&embedded=true" height="240" width="320" frameborder="0"></iframe>
 		$gdoc = $doc->createElement ( 'iframe' );
 		$gdoc->setAttribute ( 'style', 'width: 100%; height: 1000px;' );
