@@ -203,9 +203,9 @@ class AttachmentPreviewPlugin extends Plugin {
 				'html' => 'addHTML' 
 		);
 		
-		$audio = array(
+		$audio = array (
 				'wav' => 'addAudio',
-				'mp3' => 'addAudio',	
+				'mp3' => 'addAudio' 
 		);
 		
 		$allowed_extensions = array ();
@@ -452,9 +452,17 @@ class AttachmentPreviewPlugin extends Plugin {
 		$pdf->setAttribute ( 'height', '1000px' );
 		$pdf->setAttribute ( 'data', $link->getAttribute ( 'href' ) );
 		$pdf->setAttribute ( 'type', 'application/pdf' );
+		
+		$emb = $doc->createElement ( 'embed' );
+		$emb->setAttribute ( 'width', '100%' );
+		$emb->setAttribute ( 'height', '1000px' );
+		$emb->setAttribute ( 'src', $link->getAttribute ( 'href' ) );
+		$emb->setAttribute ( 'type', 'application/pdf' );
+		$pdf->appendChild ( $emb ); // for lower class browsers..
+		
 		$message = $doc->createElement ( 'b' );
 		$message->nodeValue = "Your browser is unable to display this PDF.";
-		$pdf->appendChild ( $message );
+		$pdf->appendChild ( $message ); // For failing browsers.
 		
 		static $fix_css;
 		if (! isset ( $fix_css )) {
@@ -495,14 +503,14 @@ class AttachmentPreviewPlugin extends Plugin {
 	/**
 	 * Converts a linked audio file into an embedded HTML5 player.
 	 *
-	 * @param DOMDocument $doc
-	 * @param DOMElement $link
+	 * @param DOMDocument $doc        	
+	 * @param DOMElement $link        	
 	 */
 	private function addAudio(DOMDocument $doc, DOMElement $link) {
 		$audio = $doc->createElement ( 'audio' );
-		//$audio->setAttribute('autoplay','false');
-		//$audio->setAttribute('loop','false');
-		$audio->setAttribute('preload','auto');
+		// $audio->setAttribute('autoplay','false');
+		// $audio->setAttribute('loop','false');
+		$audio->setAttribute ( 'preload', 'auto' );
 		$audio->setAttribute ( 'controls', 1 );
 		$audio->setAttribute ( 'src', $link->getAttribute ( 'href' ) );
 		$this->wrap ( $doc, $link, $audio );
@@ -531,21 +539,92 @@ class AttachmentPreviewPlugin extends Plugin {
 	 * @param DOMElement $link        	
 	 */
 	private function addHTML(DOMDocument $doc, DOMElement $link) {
-		try {
-			$url = $link->getAttribute ( 'href' );
-			// Can't just "throw" html at some DOM, we'll need to construct a new DOM
-			// And import the nodes from it into our current DOM. Wooo.
-			$html_document = new \DOMDocument ();
-			// Grab the data from the file, run it through a filter, then load it into the new DOM
-			@$html_document->loadHTML ( Format::sanitize ( $this->convertAttachmentUrlToFileContents ( $url ) ) );
-			$node = $doc->importNode ( $html_document->documentElement, true );
-			$this->wrap ( $doc, $link, $node );
-		} catch ( \Exception $e ) {
-			// Likely, we'll get some form of "Wrong Document Exception"..
-			$error_node = $doc->createElement ( 'span' );
-			$error_node->nodeValue = 'Unable to import this attachment into the DOM.';
-			$this->wrap ( $doc, $link, $error_node );
+		
+		// The files are getting complex to parse manually.. and need to be downloaded by the browser to display anyway,
+		// let's just try a wee script to pull them?
+		// It's a bit messy, but the first script is only included once.. and it is used to prevent some XSS type attacks.. 
+		// wouldn't want an html attachment to break everything.. 
+		static $trim_func;
+		if (! $trim_func) {
+			$trim_func = TRUE;
+			$t = $doc->createElement ( 'script' );
+			$t->setAttribute ( 'name', 'Hand Sanitizer' );
+			$t->nodeValue = <<<HANDSANITIZER
+	// src: https://gist.github.com/ufologist/5a0da51b2b9ef1b861c30254172ac3c9
+    var sanitizer = {};
+    (function($) {
+		var safe = '<a><b><blockquote><dd><div><dl><dt><em><h1><h2><h3><h4><i><img><li><ol><p><pre><s><sup><sub><strong><strike><ul><br><hr><table><th><tr><td><tbody><tfoot>';
+
+	    function trimAttributes(node) {
+	        $.each(node.attributes, function() {
+	            var attrName = this.name;
+	            var attrValue = this.value;
+	           //	if (attrName.indexOf('on') == 0 || attrValue.indexOf('javascript:') == 0) {
+				// we could filter the "script" attributes, or just purge them all.. 
+	                $(node).removeAttr(attrName);
+	           // }
+	        });
+	    }
+	    sanitizer.sanitize = function(html) {
+			html = strip_tags(html,safe);
+	        var output = $($.parseHTML('<div>' + $.trim(html) + '</div>', null, false));	
+	        output.find('*').each(function() {
+	            trimAttributes(this);
+	        });
+	        return output.html();
+	    }
+
+		//http://locutus.io/php/strings/strip_tags/ filter the html to only those acceptable tags above
+		function strip_tags (input, allowed) {
+		  allowed = (((allowed || '') + '').toLowerCase().match(/<[a-z][a-z0-9]*>/g) || []).join('')
+		  var tags = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi
+		  var commentsAndPhpTags = /<!--[\s\S]*?-->|<\?(?:php)?[\s\S]*?\?>/gi
+		  return input.replace(commentsAndPhpTags, '').replace(tags, function ($0, $1) {
+		    return allowed.indexOf('<' + $1.toLowerCase() + '>') > -1 ? $0 : ''
+		  })
 		}
+    })(jQuery);
+HANDSANITIZER;
+			$doc->appendChild ( $t );
+		}
+		
+		$url = $link->getAttribute ( 'href' );
+		$id = md5 ( $url );
+		$s = $doc->createElement ( 'script' );
+		$s->setAttribute('name','Attachment Fetching Script..');
+		
+		// Find the parent of itself and replace it's contents (ie, this script) with the remote HTML file's code, after removing most of the cruft/dangerzone stuff:
+		$s->nodeValue = '$(document).ready(function(){$.get("' . $url . '",function(data){$("#' . $id . '").html($("<div>" + $.trim(sanitizer.sanitize(data)) + "</div>"));});});';
+		$d = $doc->createElement ( 'div' );
+		$d->setAttribute ( 'id', $id );
+		
+		$d->appendChild ( $s );
+		
+		$this->wrap ( $doc, $link, $d );
+		
+		return;
+		
+		/*
+		 *
+		 * try {
+		 * $url = $link->getAttribute ( 'href' );
+		 * // Can't just "throw" html at some DOM, we'll need to construct a new DOM
+		 * // And import the nodes from it into our current DOM. Wooo.
+		 * $html_document = new \DOMDocument ();
+		 * // Grab the data from the file, run it through a filter, then load it into the new DOM
+		 * $html_contents = Format::sanitize ( $this->convertAttachmentUrlToFileContents ( $url ) );
+		 * if (strlen ( $html_contents )) {
+		 * @$html_document->loadHTML ( $html_contents );
+		 * $node = $doc->importNode ( $html_document->documentElement, true );
+		 * $this->wrap ( $doc, $link, $node );
+		 * }
+		 * } catch ( \Exception $e ) {
+		 * // Likely, we'll get some form of "Wrong Document Exception"..
+		 * $error_node = $doc->createElement ( 'span' );
+		 * $error_node->nodeValue = 'Unable to import this attachment into the DOM.';
+		 * $this->wrap ( $doc, $link, $error_node );
+		 * }
+		 */
 	}
 	
 	/**
@@ -556,10 +635,24 @@ class AttachmentPreviewPlugin extends Plugin {
 	 */
 	private function addTEXT(DOMDocument $doc, DOMElement $link) {
 		$url = $link->getAttribute ( 'href' );
-		$text_element = $doc->createElement ( 'pre' );
-		// Don't even bother filtering the "html", just convert everything into plain text. See how it likes that!
-		$text_element->nodeValue = htmlentities ( $this->convertAttachmentUrlToFileContents ( $url ), ENT_NOQUOTES );
-		$this->wrap ( $doc, $link, $text_element );
+		$id = md5 ( $url );
+		$s = $doc->createElement ( 'script' );
+		// Use ajax to fetch the text file, insert it as the plaintext content of the script's parent node <pre>
+		$s->nodeValue = '$(document).ready(function(){$.get("' . $url . '",function(data){$("#' . $id . '").text(data);});});';
+		$pre = $doc->createElement ( 'pre' );
+		$pre->setAttribute ( 'id', $id );
+		$pre->appendChild ( $s );
+		$this->wrap ( $doc, $link, $pre);
+		
+		return;
+		
+		/*
+		 * $url = $link->getAttribute ( 'href' );
+		 * $text_element = $doc->createElement ( 'pre' );
+		 * // Don't even bother filtering the "html", just convert everything into plain text. See how it likes that!
+		 * $text_element->nodeValue = htmlentities ( $this->convertAttachmentUrlToFileContents ( $url ), ENT_NOQUOTES );
+		 * $this->wrap ( $doc, $link, $text_element );
+		 */
 	}
 	
 	/**
@@ -589,23 +682,66 @@ class AttachmentPreviewPlugin extends Plugin {
 	 * @return unknown|string
 	 */
 	private function convertAttachmentUrlToFileContents($url) {
+		throw new \Exception ( "He's dead Jim.. :-(" );
 		// Pulled from /file.php and adapted..
-		// Attempt to validate.. just like file.php would
-		$key = array ();
-		if (preg_match ( '/^.*\?key=(.+)&expires=(.+)&signature=(.+)$/i', $url, $key )) {
-			list ( $key, $expires, $signature ) = $key;
-			if ($file = AttachmentFile::lookup ( $key )) {
-				if ($file->verifySignature ( $signature, $expires )) {
-					
-					// Connect to the Storage backend
-					$backend = $file->open ();
-					
-					// Load the file entirely (I imagine this is like file_get_contents, but abstracted)
-					return $backend->read ();
-				}
-			}
-		}
-		return '';
+		// Attempt to validate.. just like /scp/file.php would.. damnit. They've changed it again!
+	/**
+	 * /scp/file.php
+	 * $h=trim($_GET['h']);
+	 * //basic checks
+	 * if(!$h || strlen($h)!=64 //32*2
+	 * || !($file=AttachmentFile::lookup(substr($h,0,32))) //first 32 is the file hash.
+	 * || strcasecmp(substr($h,-32),md5($file->getId().session_id().$file->getHash()))) //next 32 is file id + session hash.
+	 * die('Unknown or invalid file. #'.Format::htmlchars($_GET['h']));
+	 *
+	 * /file.php
+	 *
+	 * //Basic checks
+	 * if (!$_GET['key']
+	 * || !$_GET['signature']
+	 * || !$_GET['expires']
+	 * || !($file = AttachmentFile::lookup($_GET['key']))
+	 * ) {
+	 * Http::response(404, __('Unknown or invalid file'));
+	 * }
+	 * // Validate session access hash - we want to make sure the link is FRESH!
+	 * // and the user has access to the parent ticket!!
+	 * if ($file->verifySignature($_GET['signature'], $_GET['expires'])) {
+	 * try {
+	 * if (($s = @$_GET['s']) && strpos($file->getType(), 'image/') === 0)
+	 * return $file->display($s);
+	 *
+	 * // Download the file..
+	 * $file->download(@$_GET['disposition'] ?: false, $_GET['expires']);
+	 * }
+	 * catch (Exception $ex) {
+	 * Http::response(500, 'Unable to find that file: '.$ex->getMessage());
+	 * }
+	 * }
+	 *
+	 * @var array $key
+	 */
+		/*
+		 * this used to work..
+		 * $key = array ();
+		 * if (preg_match ( '/^.*\?key=(.+)&expires=(.+)&signature=(.+)$/i', $url, $key )) {
+		 * list ( $key, $expires, $signature ) = $key;
+		 * if ($file = AttachmentFile::lookup ( $key )) {
+		 * if ($file->verifySignature ( $signature, $expires )) {
+		 *
+		 * // Hack
+		 * return $file->getData(); // only works for small files.. :-(
+		 *
+		 * // Connect to the Storage backend
+		 * $backend = $file->open ();
+		 *
+		 * // Load the file entirely (I imagine this is like file_get_contents, but abstracted)
+		 * return $backend->read ();
+		 * }
+		 * }
+		 * }
+		 * return '';
+		 */
 	}
 	
 	/**
