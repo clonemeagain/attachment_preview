@@ -145,7 +145,12 @@ class AttachmentPreviewPlugin extends Plugin
                 // Note: This also checks foreign_elements
                 print $this->inlineAttachments(ob_get_clean());
             });
-        } elseif (count(self::$foreign_elements)) {
+        }
+        
+        // There won't be any foreign elements after the first one has finished, as it deletes them after processing
+        // Therefore, these must be sent after, or, or the first one isn't applicable.
+        // The API stands seperate to the ostensible purpose of the plugin.
+        if (count(self::$foreign_elements)) {
             if (self::DEBUG) {
                 $this->log("Found " . count(self::$foreign_elements) . " other users of API.");
             }
@@ -351,7 +356,7 @@ class AttachmentPreviewPlugin extends Plugin
         }
         
         // Because PJax isn't a full document, it kinda breaks DOMDocument
-        // Which expects a full document! (You know, DOCTYPE, <HTML> <BODY> etc.. )
+        // Which expects a full document! (You know with a DOCTYPE, <HTML> <BODY> etc.. )
         if (self::isPjax() && (strpos($html, '<!DOCTYPE') !== 0 || strpos($html, '<html') !== 0)) {
             $this->log('pjax prefix trick in operation..');
             // Prefix the non-doctyped html snippet with an xml prefix
@@ -715,19 +720,72 @@ HANDSANITIZER;
     private function wrap(DOMDocument $doc, DOMElement $source, DOMElement $new_child)
     {
         static $number = 0;
-        $limit = $this->getConfig()->get('show-initially');
+        
+        // Implement rate-limit for attachments. Only show the admin configured amount at first
+        // if there are any more, we will inject them as normal, however they will be shown as
+        // links to display the attachment, not the attachment.
+        static $insert_javascript;
+        static $limit;
+        if (! isset($limit)) {
+            $limit = $this->getConfig()->get('show-initially');
+            
+            // We can use this static check to insert the css once as well!
+            $css = $doc->createElement('style');
+            $css->setAttribute('name', 'Attachments Preview Stylesheet');
+            $css->nodeValue = <<<CSS
+/** Allow attachments to be as big as the thread */
+.thread-body .attachment-info {
+width: 100%;
+}
+/** Add some border pretties and margins */
+div.embedded {
+    max-width: 100%; 
+    height: auto; 
+    padding: 4px; 
+    border: 1px solid #C3D9FF; 
+    margin-top: 10px; 
+}
+/* If we get reeeeeallly specific with it, CSS let's us override things in a stylesheet */
+.thread-body > div.attachments > span.attachment-info > div.embedded { 
+    margin-bottom: 10px !important;
+}
+CSS;
+            
+            $source->parentNode->appendChild($css);
+        }
         
         $number ++;
         if ($limit && $number > $limit) {
+            
+            // Only insert the javascript once.
+            if (! $insert_javascript) {
+                $insert_javascript = 'once';
+                $toggle_script = $doc->createElement('script');
+                $hide = __('Hide Attachment');
+                $show = __('Show Attachment');
+                $toggle_script->setAttribute('type', 'text/javascript');
+                $toggle_script->setAttribute('name', 'Attachments Preview Toggle Script');
+                $toggle_script->nodeValue = <<<TOGGLE
+function toggle_attachment(item,key) { 
+    $('#' + key).toggle(); 
+    if($(item).text() == '$hide'){ 
+        $(item).text('$show'); 
+    }else{ 
+        $(item).text('$hide'); 
+    }
+    return false;
+}
+TOGGLE;
+                $source->parentNode->appendChild($toggle_script);
+            }
             // Instead of injecting the element normally, let's instead hide it, and show a button to click on
-            $key = md5($source->getAttribute('href'));
+            $id = 'extra-' . $number;
             $button = $doc->createElement('a');
-            $button->setAttribute('onClick', $this->getScript($key, __('Show Attachment'), __('Hide Attachment')));
-            $button->nodeValue = __('Show Attachment');
+            $button->setAttribute('onClick', "javascript:toggle_attachment(this,'$id');");
+            $button->nodeValue = __('Show Attachment'); // Initially set the text to this
             $wrapper = $doc->createElement('div');
-            $wrapper->setAttribute('id', $key);
+            $wrapper->setAttribute('id', $id);
             $wrapper->setAttribute('class', 'embedded hidden hidden-attachment');
-            $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
             $wrapper->appendChild($new_child);
             $source->parentNode->appendChild($wrapper);
             $source->parentNode->appendChild($button);
@@ -736,15 +794,9 @@ HANDSANITIZER;
         
         $wrapper = $doc->createElement('div');
         $wrapper->setAttribute('class', 'embedded');
-        $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
+        // $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
         $wrapper->appendChild($new_child);
         $source->parentNode->appendChild($wrapper);
-    }
-
-    private function getScript($key, $show, $hide)
-    {
-        // TODO: Doesn't scale, should use class and one script!
-        return "$('#$key').toggle(); if($(this).text() == '$hide'){ $(this).text('$show'); }else{ $(this).text('$hide'); }; return false;";
     }
 
     /**
@@ -841,7 +893,7 @@ HANDSANITIZER;
                             $test = 0;
                             foreach ($finder->query($structure->expression) as $node) {
                                 $test ++;
-                                $this->update($node, $structure, $imported_element);
+                                $this->updateStructure($node, $structure, $imported_element);
                             }
                             if (! $test) {
                                 throw new Exception("Nothing matched: {$structure->expression}");
@@ -855,11 +907,11 @@ HANDSANITIZER;
                                 $this->log("Unable to find node with expression {$structure->expression}");
                                 continue;
                             }
-                            $this->update($node, $structure, $imported_element);
+                            $this->updateStructure($node, $structure, $imported_element);
                             break;
                         case 'tag':
                             foreach ($dom->getElementsByTagName($structure->expression) as $node) {
-                                $this->update($node, $structure, $imported_element);
+                                $this->updateStructure($node, $structure, $imported_element);
                             }
                             break;
                         default:
@@ -877,17 +929,14 @@ HANDSANITIZER;
     }
 
     /**
-     * Really poorly named function,
-     *
-     * Connects a remote structure with a DOMElement. either setting attributes, or appending or replacing nodes..
-     *
-     * Does quite a bit for something so small.
+     * Connects a remote structure with a DOMElement.
+     * either setting attributes, or appending or replacing nodes..
      *
      * @param \DOMElement $node
      * @param stdClass $structure
      * @param \DOMElement $imported_element
      */
-    private function update(\DOMElement $node, $structure, \DOMElement $imported_element = null)
+    private function updateStructure(\DOMElement $node, $structure, \DOMElement $imported_element = null)
     {
         if ($structure->replace_found) {
             $node->parentNode->replaceChild($node, $imported_element);
@@ -943,8 +992,7 @@ HANDSANITIZER;
                 // URL contains a=edit, which we don't want to screw with yet
                 $tickets_view = FALSE;
             } elseif (strpos($url, 'index.php') || strpos($url, 'tickets.php')) {
-                // URL contains either index.php or tickets.php, so isn't a tickets view page.
-                // Just might be a ticket page..
+                // URL contains either index.php or tickets.php, so just might be a ticket page..
                 $tickets_view = TRUE;
             }
             
@@ -1004,6 +1052,7 @@ HANDSANITIZER;
     
     /**
      * Determines if the page was/is being build from a PJAX request.
+     * Uses the sneaky cheat request header method..
      *
      * @return bool
      */
