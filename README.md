@@ -11,11 +11,10 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 - HTML files are filtered and inserted (If enabled). 
 - Youtube links in comments can be used to create embedded `<iframe>` players. (if enabled)
 - HTML5 Compatible video formats attached are embedded as `<video>` players. (if enabled)
-- XLS/DOC files can be previewed inline using the Google Docs Embedded viewer. [info](http://googlesystem.blogspot.com.au/2009/09/embeddable-google-document-viewer.html)
 - All modifications to the DOM are now performed on the server.
 - Admin can choose the types of attachments to inline, and who can inline them.
 - Default admin options are embed "PDF's & Images" only for "Agents".
-- Plugin API: allows other plugins to manipulate the DOM without adding race conditions or multiple reparses.
+- Plugin API: allows other plugins to manipulate the DOM without adding race conditions or multiple re-parses.
 
 ## To Install:
 1. Simply `git clone https://github.com/clonemeagain/attachment_preview.git /includes/plugins/attachment_preview` Or extract [latest-zip](https://github.com/clonemeagain/attachment_preview/archive/master.zip) into /includes/plugins/attachment_preview
@@ -28,9 +27,6 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 Navigate to admin plugins view, click the checkbox and push the "Delete" button.
 
 The plugin will still be available, you have deleted the config only at this point, to remove after deleting, remove the /plugins/attachment_preview folder.
-
-
-
 
 
 # How it works:

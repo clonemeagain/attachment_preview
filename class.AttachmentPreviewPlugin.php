@@ -352,7 +352,8 @@ class AttachmentPreviewPlugin extends Plugin
         
         // Because PJax isn't a full document, it kinda breaks DOMDocument
         // Which expects a full document! (You know, DOCTYPE, <HTML> <BODY> etc.. )
-        if (self::isPjax() && (strpos($html, '<!DOCTYPE') == 0 || strpos($html, '<html') == 0)) {
+        if (self::isPjax() && (strpos($html, '<!DOCTYPE') !== 0 || strpos($html, '<html') !== 0)) {
+            $this->log('pjax prefix trick in operation..');
             // Prefix the non-doctyped html snippet with an xml prefix
             // This tricks DOMDocument into loading the HTML snippet
             $html = self::xml_prefix . $html;
