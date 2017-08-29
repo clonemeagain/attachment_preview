@@ -61,8 +61,21 @@ class AttachmentPreviewPluginConfig extends PluginConfig
             'attachment-enabled' => new BooleanField(array(
                 'label' => $__('Permission'),
                 'default' => TRUE,
-                'hint' => 'Check to enable attachments inline, disable to allow API to function.',
-
+                'hint' => 'Check to enable attachments inline, disable to allow API to function.'
+            
+            )),
+            'show-initially' => new ChoiceField(array(
+                'label' => $__('Number of attachments to show initially'),
+                'default' => 0,
+                'hint' => $__('If you find too many attachments displaying at once is slowing you down, change this to only show some of them at first.'),
+                'choices' => array(
+                    0 => $__('All'),
+                    1 => '1',
+                    10 => '10',
+                    20 => '20',
+                    50 => '50',
+                    100 => '100'
+                )
             ))
         );
     }

@@ -37,7 +37,7 @@ class AttachmentPreviewPlugin extends Plugin
      *
      * @var string
      */
-    const DEBUG = FALSE;
+    const DEBUG = TRUE;
 
     /**
      * The PJAX defying XML prefix string
@@ -714,11 +714,37 @@ HANDSANITIZER;
      */
     private function wrap(DOMDocument $doc, DOMElement $source, DOMElement $new_child)
     {
+        static $number = 0;
+        $limit = $this->getConfig()->get('show-initially');
+        
+        $number ++;
+        if ($limit && $number > $limit) {
+            // Instead of injecting the element normally, let's instead hide it, and show a button to click on
+            $key = md5($source->getAttribute('href'));
+            $button = $doc->createElement('a');
+            $button->setAttribute('onClick', $this->getScript($key, __('Show Attachment'), __('Hide Attachment')));
+            $button->nodeValue = __('Show Attachment');
+            $wrapper = $doc->createElement('div');
+            $wrapper->setAttribute('id', $key);
+            $wrapper->setAttribute('class', 'embedded hidden hidden-attachment');
+            $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
+            $wrapper->appendChild($new_child);
+            $source->parentNode->appendChild($wrapper);
+            $source->parentNode->appendChild($button);
+            return;
+        }
+        
         $wrapper = $doc->createElement('div');
         $wrapper->setAttribute('class', 'embedded');
         $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
         $wrapper->appendChild($new_child);
         $source->parentNode->appendChild($wrapper);
+    }
+
+    private function getScript($key, $show, $hide)
+    {
+        // TODO: Doesn't scale, should use class and one script!
+        return "$('#$key').toggle(); if($(this).text() == '$hide'){ $(this).text('$show'); }else{ $(this).text('$hide'); }; return false;";
     }
 
     /**
