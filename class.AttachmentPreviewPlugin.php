@@ -37,7 +37,7 @@ class AttachmentPreviewPlugin extends Plugin
      *
      * @var string
      */
-    const DEBUG = TRUE;
+    const DEBUG = FALSE;
 
     /**
      * The PJAX defying XML prefix string
