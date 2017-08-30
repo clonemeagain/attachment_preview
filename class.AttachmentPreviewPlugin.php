@@ -69,6 +69,10 @@ class AttachmentPreviewPlugin extends Plugin
      */
     private $appended;
 
+    private $number;
+
+    private $limit;
+
     /**
      * Required stub.
      *
@@ -275,6 +279,9 @@ class AttachmentPreviewPlugin extends Plugin
         
         // Let's not get regex happy.. we all have the tendency.. :-)
         $dom = $this->getDom($html);
+        
+        $this->number = 0;
+        $this->limit = $config->get('show-initially');
         
         // Find all URLs: http://stackoverflow.com/a/29272222
         foreach ($dom->getElementsByTagName('a') as $link) {
@@ -539,16 +546,6 @@ class AttachmentPreviewPlugin extends Plugin
         $message->nodeValue = "Your browser is unable to display this PDF.";
         $pdf->appendChild($message);
         
-        static $fix_css;
-        if (! isset($fix_css)) {
-            $fix_css = TRUE;
-            // Create the new element to inject/replace existing
-            $css = $doc->createElement('style');
-            $css->setAttribute('name', 'Plugin: Attachment Preview PDF Stylesheet');
-            $css->nodeValue = '.thread-body span.attachment-info { width: 100%; height: auto; }';
-            $pdf->appendChild($css);
-        }
-        
         $this->wrap($doc, $link, $pdf);
     }
 
@@ -669,21 +666,9 @@ HANDSANITIZER;
             $doc->appendChild($t);
         }
         
-        $url = $link->getAttribute('href');
-        $id = md5($url);
-        $script = $doc->createElement('script');
-        $script->setAttribute('name', 'Attachment Fetching Script..');
-        // Find the parent of itself and replace it's contents (ie, this script) with
-        // the remote HTML file's code, after removing most of the cruft/dangerzone stuff:
-        // Basically, write a custom piece of jQuery per attachment
-        // that replaces itself with the attachment's HTML:
-        $script->nodeValue = '$(document).ready(function(){$.get("' . $url . '",function(data){$("#' . $id . '").html($("<div>" + $.trim(sanitizer.sanitize(data)) + "</div>"));});});';
-        // Build a div to put the html in:
         $d = $doc->createElement('div');
-        $d->setAttribute('id', $id);
-        // Add the script/new-nodes to the div
-        $d->appendChild($script);
-        
+        $d->setAttribute('data-url', $link->getAttribute('href'));
+        $d->setAttribute('data-type', 'html');
         $this->wrap($doc, $link, $d);
     }
 
@@ -695,14 +680,9 @@ HANDSANITIZER;
      */
     private function addTEXT(DOMDocument $doc, DOMElement $link)
     {
-        $url = $link->getAttribute('href');
-        $id = md5($url);
-        $s = $doc->createElement('script');
-        // Use ajax to fetch the text file, insert it as the plaintext content of the script's parent node <pre>
-        $s->nodeValue = '$(document).ready(function(){$.get("' . $url . '",function(data){$("#' . $id . '").text(data);});});';
         $pre = $doc->createElement('pre');
-        $pre->setAttribute('id', $id);
-        $pre->appendChild($s);
+        $pre->setAttribute('data-url', $link->getAttribute('href'));
+        $pre->setAttribute('data-type', 'text');
         $this->wrap($doc, $link, $pre);
     }
 
@@ -719,25 +699,23 @@ HANDSANITIZER;
      */
     private function wrap(DOMDocument $doc, DOMElement $source, DOMElement $new_child)
     {
-        static $number = 0;
+        // Implement a limit for attachments. Only show the admin configured amount at first
+        // if there are any more, we will inject them, however they will be shown as buttons
+        static $number;
         
-        // Implement rate-limit for attachments. Only show the admin configured amount at first
-        // if there are any more, we will inject them as normal, however they will be shown as
-        // links to display the attachment, not the attachment.
-        static $insert_javascript;
-        static $limit;
-        if (! isset($limit)) {
-            $limit = $this->getConfig()->get('show-initially');
+        if (! isset($number)) {
             
             // We can use this static check to insert the css once as well!
+            // Build an attachments stylesheet for everything that get's wrapped (everything)
             $css = $doc->createElement('style');
             $css->setAttribute('name', 'Attachments Preview Stylesheet');
             $css->nodeValue = <<<CSS
 /** Allow attachments to be as big as the thread */
 .thread-body .attachment-info {
-width: 100%;
+    width: 100%;
+    height:auto;
 }
-/** Add some border pretties and margins */
+/** Add some borders and margins */
 div.embedded {
     max-width: 100%; 
     height: auto; 
@@ -752,50 +730,96 @@ div.embedded {
 CSS;
             
             $source->parentNode->appendChild($css);
-        }
-        
-        $number ++;
-        if ($limit && $number > $limit) {
             
-            // Only insert the javascript once.
-            if (! $insert_javascript) {
-                $insert_javascript = 'once';
-                $toggle_script = $doc->createElement('script');
-                $hide = __('Hide Attachment');
-                $show = __('Show Attachment');
-                $toggle_script->setAttribute('type', 'text/javascript');
-                $toggle_script->setAttribute('name', 'Attachments Preview Toggle Script');
-                $toggle_script->nodeValue = <<<TOGGLE
-function toggle_attachment(item,key) { 
-    $('#' + key).toggle(); 
-    if($(item).text() == '$hide'){ 
-        $(item).text('$show'); 
-    }else{ 
-        $(item).text('$hide'); 
-    }
-    return false;
+            // This script simply toggles the display of the attachment
+            $toggle_script = $doc->createElement('script');
+            $hide = __('Hide Attachment');
+            $show = __('Show Attachment');
+            $toggle_script->setAttribute('type', 'text/javascript');
+            $toggle_script->setAttribute('name', 'Attachments Preview Toggle Script');
+            
+            // I'm against dynamically generated scripts, however in this case
+            // it makes it translateable.. so, win!
+            $toggle_script->nodeValue = <<<SCRIPT
+
+// Setup handler to receive Attachments Preview Fetch events:
+$(document)
+	.on('ap:fetch', function (e) {
+		var elem = $(e.target)
+			.find('*')
+			.first();
+		var type = elem.data('type'),
+			id = elem.attr('id'),
+			url = elem.data('url');
+
+		// Validate we've enough to fetch the file:
+        // Fix weird &&&'s bug.. if you use three of them, afterwards, you can use two.. odd.
+		if (type && id && url) {
+			if (type == 'text') {
+				// Get the text and replace the element with it:
+				$.get(url, function (data) {
+					elem.text(data);
+				});
+			} else if (type == 'html') {
+				$.get(url, function (data) {
+					elem.html($("<div > " + $.trim(sanitizer.sanitize(data)) + "</div>"));
+				});
+			}
+			// prevent repeated fetch events from re-fetching
+			elem.data('type', '');
+		}
+	});
+
+$(document)
+	.on('ready', function () {
+		console.log("Triggering AttachmentPreview initial fetch (admin limit set to {$this->limit}).");
+		$('.embedded:not(.hidden)')
+			.trigger('ap:fetch');
+	});
+
+function ap_toggle(item, key) {
+	var i = $(item),
+		elem = $('#' + key);
+	elem.toggle();
+	if (i.text() == '$hide') {
+		i.text('$show');
+	} else {
+		elem.trigger('ap:fetch');
+		i.text('$hide');
+	}
+	return false;
 }
-TOGGLE;
-                $source->parentNode->appendChild($toggle_script);
-            }
-            // Instead of injecting the element normally, let's instead hide it, and show a button to click on
-            $id = 'extra-' . $number;
-            $button = $doc->createElement('a');
-            $button->setAttribute('onClick', "javascript:toggle_attachment(this,'$id');");
-            $button->nodeValue = __('Show Attachment'); // Initially set the text to this
-            $wrapper = $doc->createElement('div');
-            $wrapper->setAttribute('id', $id);
-            $wrapper->setAttribute('class', 'embedded hidden hidden-attachment');
-            $wrapper->appendChild($new_child);
-            $source->parentNode->appendChild($wrapper);
-            $source->parentNode->appendChild($button);
-            return;
+SCRIPT;
+            $source->parentNode->appendChild($toggle_script);
         }
         
+        // Build a wrapper element to contain the attachment
         $wrapper = $doc->createElement('div');
-        $wrapper->setAttribute('class', 'embedded');
-        // $wrapper->setAttribute('style', 'max-width: 100%; height: auto; padding: 4px; border: 1px solid #C3D9FF; margin-top: 10px; margin-bottom: 10px !important;');
+        $number ++; // Which attachment are we adding? Let's give it a number.
+        $id = 'ap-file-' . $number;
+        $wrapper->setAttribute('id', $id);
+        
+        // Brand the child with the parent's id.. for ease of scripting
+        $cid = "$id-c";
+        $new_child->setAttribute('id', $cid);
+        
+        // Add the wrapped embedded attachment into the wrapper:
         $wrapper->appendChild($new_child);
+        
+        // See if we are over the admin-defined maximum number of inline-attachments:
+        if ($this->limit && $number > $this->limit) {
+            // Instead of injecting the element normally, let's instead hide it, and show a button to click
+            $button = $doc->createElement('a');
+            $button->setAttribute('class', 'button'); // Sexify the "button" with buttony goodness!
+            $button->setAttribute('onClick', "javascript:ap_toggle(this,'$id');");
+            $button->nodeValue = __('Show Attachment'); // Initially set the text to this
+            $wrapper->setAttribute('class', 'embedded hidden hidden-attachment'); // Set the class of the wrapper to hidden-attachment
+            $source->parentNode->appendChild($button); // Insert the button before the wrapper, so it stays where it is when the wrapper expands.
+        } else {
+            // This attachment isn't limited, so, don't hide it:
+            $wrapper->setAttribute('class', 'embedded');
+        }
+        // Add the wrapper to the thread.
         $source->parentNode->appendChild($wrapper);
     }
 
