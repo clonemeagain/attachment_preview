@@ -69,8 +69,6 @@ class AttachmentPreviewPlugin extends Plugin
      */
     private $appended;
 
-    private $number;
-
     private $limit;
 
     /**
@@ -526,26 +524,27 @@ class AttachmentPreviewPlugin extends Plugin
      */
     private function addPDF(DOMDocument $doc, DOMElement $link)
     {
+        $url = $link->getAttribute('href');
         // Build a Chrome/Firefox compatible <object> to hold the PDF
         $pdf = $doc->createElement('object');
         $pdf->setAttribute('width', '100%');
         $pdf->setAttribute('height', '1000px');
-        $pdf->setAttribute('data', $link->getAttribute('href') . '&disposition=inline');
+        // $pdf->setAttribute('data', $url . '&disposition=inline'); // Can't use inline disposition with XSS security rules.. :-(
         $pdf->setAttribute('type', 'application/pdf');
+        $pdf->setAttribute('data-type', 'pdf');
+        $pdf->setAttribute('data-url', $url);
         
-        // Build a backup <embed> to hide inside the <object>
-        $emb = $doc->createElement('embed');
-        $emb->setAttribute('width', '100%');
-        $emb->setAttribute('height', '1000px');
-        $emb->setAttribute('src', $link->getAttribute('href') . '&disposition=inline');
-        $emb->setAttribute('type', 'application/pdf');
-        $pdf->appendChild($emb); // for lower class browsers.. like IE
-                                 
         // Add a <b>Nope</b> type message for obsolete or text-based browsers.
         $message = $doc->createElement('b');
-        $message->nodeValue = "Your browser is unable to display this PDF.";
+        $message->nodeValue = 'Your "browser" is unable to display this PDF. ';
+        $call_to_action = $doc->createElement('a');
+        $call_to_action->setAttribute('href', 'http://abetterbrowser.org/');
+        $call_to_action->setAttribute('title', 'Get a better browser to use this content inline.');
+        $call_to_action->nodeValue = 'Help';
+        $message->appendChild($call_to_action);
         $pdf->appendChild($message);
         
+        // Build a backup <embed> to hide inside the <object> for low class browsers.. i.e: IE (we'll do it in js)
         $this->wrap($doc, $link, $pdf);
     }
 
@@ -755,7 +754,30 @@ $(document)
 		// Validate we've enough to fetch the file:
         // Fix weird &&&'s bug.. if you use three of them, afterwards, you can use two.. odd.
 		if (type && id && url) {
-			if (type == 'text') {
+            if(type == 'pdf'){
+                // Load the PDF into an Object Blob and shove it into the <embed> :-)
+                //TODO: Rewrite in jQuery.. if necessary.
+                var req = new XMLHttpRequest();
+                req.open("GET",url, true)
+                req.responseType = "arraybuffer";
+                req.onload = function(e){
+                	var ab = req.response;
+                	var blob = new Blob([ab], {type: "application/pdf"});
+                	var ourl = (window.URL || window.webkitURL).createObjectURL(blob);
+                	var pdf = document.getElementById(id);
+                	var newpdf = pdf.cloneNode();
+                    if(/*@cc_on!@*/false || !!document.documentMode){
+                        // Actually, IE still cant display a PDF inside an <object>, so, we'll delete it.. because fuck you MS
+                        delete pdf; delete newpdf; return;                        
+                    }
+                    newpdf.setAttribute('data',ourl);
+                    newpdf.setAttribute('src',ourl); // needed for <embed>
+                    pdf.parentNode.replaceChild(newpdf,pdf);
+                    delete newpdf.dataset.type;
+                };
+                req.send();
+
+            }else if (type == 'text') {
 				// Get the text and replace the element with it:
 				$.get(url, function (data) {
 					elem.text(data);
@@ -771,7 +793,7 @@ $(document)
 	});
 
 $(document)
-	.on('ready', function () {
+	.on('ready pjax:success', function () {
 		console.log("Triggering AttachmentPreview initial fetch (admin limit set to {$this->limit}).");
 		$('.embedded:not(.hidden)')
 			.trigger('ap:fetch');
