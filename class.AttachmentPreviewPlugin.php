@@ -802,7 +802,7 @@ $(document)
 function ap_toggle(item, key) {
 	var i = $(item),
 		elem = $('#' + key);
-	elem.toggle();
+	elem.slideToggle();
 	if (i.text() == '$hide') {
 		i.text('$show');
 	} else {
