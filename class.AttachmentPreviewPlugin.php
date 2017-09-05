@@ -1009,7 +1009,7 @@ SCRIPT;
             // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
             if (isset($_POST['a']) && $_POST['a'] == 'open') {
                 $tickets_view = TRUE;
-            } elseif (strpos($url, '/scp/') !== FALSE) {
+            } elseif (strpos($url, '/scp/') == FALSE) {
                 // URL doesn't start with /scp/ so isn't an admin page
                 $tickets_view = FALSE;
             } elseif (isset($_POST) && count($_POST)) {
