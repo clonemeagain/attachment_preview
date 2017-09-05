@@ -54,7 +54,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig
             'attachment-enabled' => new BooleanField(array(
                 'label' => $__('Permission'),
                 'default' => TRUE,
-                'hint' => 'Check to enable attachments inline, disable to allow API to function.'
+                'hint' => 'Check to enable attachments inline, disable to onlyi allow API to function.'
             
             )),
             'show-initially' => new ChoiceField(array(
