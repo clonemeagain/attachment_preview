@@ -12,6 +12,10 @@ div.embedded {
   border: 1px solid #C3D9FF;
   margin-top: 10px;
 }
+
+div.embedded img {
+  max-width: 100%;
+}
 /* If we get reeeeeallly specific with it, CSS let's us override things in a stylesheet */
 .thread-body>div.attachments>span.attachment-info>div.embedded {
   margin-bottom: 10px !important;

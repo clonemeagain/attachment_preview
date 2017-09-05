@@ -8,12 +8,12 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
   function translate() {
     if (! method_exists('Plugin', 'translate')) {
       return [
-        function ($x) {
-          return $x;
-        },
-        function ($x, $y, $n) {
-          return $n != 1 ? $y : $x;
-        }
+          function ($x) {
+            return $x;
+          },
+          function ($x, $y, $n) {
+            return $n != 1 ? $y : $x;
+          }
       ];
     }
     return Plugin::translate('attachment_preview');
@@ -29,51 +29,78 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
   function getOptions() {
     list ($__, $_N) = self::translate();
     return [
-      'attachment' => new SectionBreakField(
-        [
-          'label' => $__('Attachment Inliner')
-        ]),
-      'attachment-video' => new BooleanField(
-        [
-          'label' => $__('Convert Youtube/video to Player'),
-          'hint' => $__(
-            "Watch video attachments and YouTube in the thread! (Default HTML5 player supports mp4,webm,ogv,3gp")
-        ]),
-      'attachment-allowed' => new ChoiceField(
-        [
-          'label' => $__('Choose the types of attachments to inline.'),
-          'default' => 'pdf-image',
-          'hint' => $__(
-            "While HTML and Text documents are filtered before being inserted in the DOM, there is always a chance this is riskier than necessary, Has no effect if txt & html extensions are not allowed to be attached in the first place."),
-          'choices' => [
-            'none' => $__('Safest: OFF'),
-            'pdf' => $__('PDF Only'),
-            'image' => $__('Images Only'),
-            'pdf-image' => $__('PDF\'s and Images'),
-            'all' => $__('I accept the risk: ALL')
-          ]
-        ]),
-      'attachment-enabled' => new BooleanField(
-        [
-          'label' => $__('Permission'),
-          'default' => TRUE,
-          'hint' => 'Check to enable attachments inline, disable to onlyi allow API to function.'
-        ]),
-      'show-initially' => new ChoiceField(
-        [
-          'label' => $__('Number of attachments to show initially'),
-          'default' => 0,
-          'hint' => $__(
-            'If you find too many attachments displaying at once is slowing you down, change this to only show some of them at first.'),
-          'choices' => [
-            0 => $__('All'),
-            1 => '1',
-            10 => '10',
-            20 => '20',
-            50 => '50',
-            100 => '100'
-          ]
-        ])
+        'attachment' => new SectionBreakField(
+          [
+              'label' => $__('Attachment Inliner')
+          ]),
+        'attachment-enabled' => new BooleanField(
+          [
+              'label' => $__('Permission'),
+              'default' => TRUE,
+              'hint' => 'Check to enable attachments inline, disable only allows API to function.'
+          ]),
+
+        'attach-pdf' => new BooleanField(
+          [
+              'label' => $__('Inline PDF files as <object>s'),
+              'default' => TRUE
+          ]),
+        'attach-image' => new BooleanField(
+          [
+              'label' => $__('Inline image files as <img>s'),
+              'default' => TRUE
+          ]),
+        'attach-text' => new BooleanField(
+          [
+              'label' => $__('Inline textfiles (txt,csv) as <pre>'),
+              'default' => TRUE
+          ]),
+        'attach-html' => new BooleanField(
+          [
+              'label' => $__('Convert Youtube links to Youtube Players'),
+              'hint' => $__(
+                'Dangerous: While we filter/sanitize the HTML, it is still riskier.'),
+              'default' => FALSE
+          ]),
+        'attach-audio' => new BooleanField(
+          [
+              'label' => $__('Convert audio attachments to Players'),
+              'default' => FALSE
+          ]),
+        'attach-video' => new BooleanField(
+          [
+              'label' => $__('Convert video attachments to Players'),
+              'hint' => $__("Embeds video attachments "),
+              'default' => FALSE
+          ]),
+        'attach-youtube' => new BooleanField(
+          [
+              'label' => $__('Convert Youtube links to Youtube Players'),
+              'default' => TRUE
+          ]),
+
+        'show-ms-upgrade-help' => new BooleanField(
+          [
+              'label' => $__('Show Microsoft upgrade Help link'),
+              'hint' => $__(
+                'Enable help link to abetterbrowser.org for PDFs when on Internet Explorer'),
+              'default' => TRUE
+          ]),
+        'show-initially' => new ChoiceField(
+          [
+              'label' => $__('Number of attachments to show initially'),
+              'default' => 0,
+              'hint' => $__(
+                'If you find too many attachments displaying at once is slowing you down, change this to only show some of them at first.'),
+              'choices' => [
+                  0 => $__('All'),
+                  1 => '1',
+                  10 => '10',
+                  20 => '20',
+                  50 => '50',
+                  100 => '100'
+              ]
+          ])
     ];
   }
 }

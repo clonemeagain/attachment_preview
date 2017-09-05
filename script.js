@@ -10,7 +10,6 @@ $(document).on(
 				case 'pdf': {
 					// Load the PDF into an Object Blob and shove it into the
 					// <embed> :-)
-					// TODO: Rewrite in jQuery.. if necessary.
 					var req = new XMLHttpRequest();
 					req.open("GET", url, true)
 					req.responseType = "arraybuffer";
@@ -19,19 +18,17 @@ $(document).on(
 						var blob = new Blob([ ab ], {
 							type : "application/pdf"
 						});
-						var ourl = (window.URL || window.webkitURL)
+						var object_url = (window.URL || window.webkitURL)
 								.createObjectURL(blob);
 						var pdf = document.getElementById(id);
 						var newpdf = pdf.cloneNode();
 						if (/* @cc_on!@ */false || !!document.documentMode) {
-							// Actually, IE still cant display a PDF inside an
-							// <object>, so, we'll delete it.. because fuck you
-							// MS
+							// IE still cant display a PDF inside an <object>,
+							// so, we'll delete it.. because fuck MS
 							delete pdf;
-							delete newpdf;
 							return;
 						}
-						newpdf.setAttribute('data', ourl);
+						newpdf.setAttribute('data', object_url);
 						// Replace the node with our new one which displays it:
 						pdf.parentNode.replaceChild(newpdf, pdf);
 						// prevent repeated fetch events from re-fetching

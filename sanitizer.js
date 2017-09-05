@@ -22,7 +22,7 @@ var sanitizer = {};
 	}
 
 	// http://locutus.io/php/strings/strip_tags/ filter the html to only those
-	// acceptable tags above
+	// acceptable tags defined above as safe
 	function strip_tags(input, allowed) {
 		allowed = (((allowed || '') + '').toLowerCase().match(
 				/<[a-z][a-z0-9]*>/g) || []).join('')
