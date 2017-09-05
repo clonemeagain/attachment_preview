@@ -35,16 +35,10 @@ class AttachmentPreviewPluginConfig extends PluginConfig
             'attachment' => new SectionBreakField(array(
                 'label' => $__('Attachment Inliner')
             )),
-            'coerce-pdf' => new BooleanField(array(
-                'label' => $__('Force PDF attachment mime'),
-                'hint' => $__('Forces PDF files to have the correct application/pdf mimetype in the database.')
-            )),
-            
             'attachment-video' => new BooleanField(array(
                 'label' => $__('Convert Youtube/video to Player'),
                 'hint' => $__("Watch video attachments and YouTube in the thread! (Default HTML5 player supports mp4,webm,ogv,3gp")
             )),
-            
             'attachment-allowed' => new ChoiceField(array(
                 'label' => $__('Choose the types of attachments to inline.'),
                 'default' => 'pdf-image',
@@ -57,7 +51,6 @@ class AttachmentPreviewPluginConfig extends PluginConfig
                     'all' => $__('I accept the risk: ALL')
                 )
             )),
-            
             'attachment-enabled' => new BooleanField(array(
                 'label' => $__('Permission'),
                 'default' => TRUE,

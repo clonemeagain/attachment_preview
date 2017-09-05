@@ -112,22 +112,6 @@ class AttachmentPreviewPlugin extends Plugin
         // Load our Admin defined settings..
         $config = $this->getConfig();
         
-        if ($config->get('coerce-pdf')) {
-            // Need to ensure attachments are saved with the correct mime-type. For some reason, a lot of my PDF's were coming through as octet-streams.. not useful.
-            // This simply waits for a ticket to be created, then runs a database query to fix the mimetype.
-            Signal::connect('ticket.created', function ($ticket, $data) {
-                // Find any attachments for this ticket
-                // See if any of them are PDF's
-                // Change the mimetype saved for that attachment..
-                
-                if (self::DEBUG)
-                    $this->log("Changing MIME Type for all PDF's");
-                // TODO: see if there is another signal after uploads we could hook for this, so we can fix each file individually?
-                db_query("update " . FILE_TABLE . " SET type = 'application/pdf' WHERE name like '%.pdf' and type like '%octet-stream'");
-                // Well, it's a bit brutal the first time, but after that, should be quick.. :-)
-            });
-        }
-        
         // Check what our URI is, if acceptable, add to the output.. :-)
         // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
         // Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
