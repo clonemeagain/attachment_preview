@@ -350,7 +350,6 @@ class AttachmentPreviewPlugin extends Plugin
         // Because PJax isn't a full document, it kinda breaks DOMDocument
         // Which expects a full document! (You know with a DOCTYPE, <HTML> <BODY> etc.. )
         if (self::isPjax() && (strpos($html, '<!DOCTYPE') !== 0 || strpos($html, '<html') !== 0)) {
-            $this->log('pjax prefix trick in operation..');
             // Prefix the non-doctyped html snippet with an xml prefix
             // This tricks DOMDocument into loading the HTML snippet
             $html = self::xml_prefix . $html;
@@ -726,6 +725,7 @@ CSS;
             
             // I'm against dynamically generated scripts, however in this case
             // it makes it translateable.. so, win!
+            $limit = $this->limit; // Support for php 5.6
             $toggle_script->nodeValue = <<<SCRIPT
 
 // Setup handler to receive Attachments Preview Fetch events:
@@ -781,7 +781,7 @@ $(document)
 
 $(document)
 	.on('ready pjax:success', function () {
-		console.log("Triggering AttachmentPreview initial fetch (admin limit set to {$this->limit}).");
+		console.log("Triggering AttachmentPreview initial fetch (admin limit set to {$limit}).");
 		$('.embedded:not(.hidden)')
 			.trigger('ap:fetch');
 	});
