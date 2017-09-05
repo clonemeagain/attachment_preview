@@ -37,7 +37,7 @@ class AttachmentPreviewPlugin extends Plugin
      *
      * @var string
      */
-    const DEBUG = TRUE;
+    const DEBUG = FALSE;
 
     /**
      * The PJAX defying XML prefix string
@@ -550,7 +550,7 @@ class AttachmentPreviewPlugin extends Plugin
             $player = $doc->createElement('iframe');
             $player->setAttribute('width', '560');
             $player->setAttribute('height', '349');
-            $player->setAttribute('src', 'http://www.youtube.com/embed/' . $youtube_id . '?rel=0&hd=1');
+            $player->setAttribute('src', 'https://www.youtube.com/embed/' . $youtube_id . '?rel=0&hd=1');
             $player->setAttribute('frameborder', 0);
             $player->setAttribute('allowfullscreen', 1);
             $this->wrap($doc, $link, $player);
