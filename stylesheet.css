@@ -1,0 +1,18 @@
+@CHARSET "ISO-8859-1";
+/** Allow attachments to be as big as the thread */
+.thread-body .attachment-info {
+  width: 100%;
+  height: auto;
+}
+/** Add some borders and margins */
+div.embedded {
+  max-width: 100%;
+  height: auto;
+  padding: 4px;
+  border: 1px solid #C3D9FF;
+  margin-top: 10px;
+}
+/* If we get reeeeeallly specific with it, CSS let's us override things in a stylesheet */
+.thread-body>div.attachments>span.attachment-info>div.embedded {
+  margin-bottom: 10px !important;
+}
