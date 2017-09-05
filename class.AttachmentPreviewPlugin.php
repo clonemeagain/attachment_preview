@@ -37,7 +37,7 @@ class AttachmentPreviewPlugin extends Plugin
      *
      * @var string
      */
-    const DEBUG = TRUE;
+    const DEBUG = FALSE;
 
     /**
      * The PJAX defying XML prefix string
@@ -271,11 +271,14 @@ class AttachmentPreviewPlugin extends Plugin
             // Check the link points to osTicket's "attachments" provider:
             // osTicket uses http://domain.tld/file.php for all attachments,
             // even /scp/ ones. Upgraded to faster strpos from preg_match
-            if (strpos($link->getAttribute('href'), '/file.php') === 0) {
+            if (strpos($link->getAttribute('href'), '/file.php') !== FALSE) { // Patch issue with subdomains.. 
                 
                 // Luckily, the attachment link contains the filename.. which we can use!
                 // Grab the extension of the file from the filename:
                 $ext = $this->getExtension($link->textContent);
+                
+                if (self::DEBUG)
+                    $this->log("Attempting to add $ext file.");
                 
                 // See if admin allowed us to inject files with this extension:
                 if (! $ext || ! isset($allowed_extensions[$ext])) {
