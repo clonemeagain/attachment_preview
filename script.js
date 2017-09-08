@@ -4,12 +4,16 @@
 /**
  * Configure handler for ready/pjax-ready events.
  * 
- * Basically, start fetching non hidden attachments.
+ * Basically, starts fetching non hidden attachments when the page is ready.
  * 
  * @returns void
  */
 $(document).on('ready pjax:success', function() {
-	$('.embedded:not(.hidden)').trigger('ap:fetch');
+	var attachments = $(".ap_embedded:not(.hidden)");
+	if(attachments.length){
+		console.log("Fetching " + attachments.length + " non-hidden attachment" + ((attachments.length > 1) ? 's.' : '.'));
+		attachments.trigger('ap:fetch');
+	}
 });
 
 /**
@@ -57,6 +61,7 @@ function fetch_pdf(id, url) {
 		var blob = new Blob([ ab ], {
 			type : "application/pdf"
 		});
+		// Convert the binary blob of PDF data into an Object URL
 		var object_url = (window.URL || window.webkitURL).createObjectURL(blob);
 		var pdf = document.getElementById(id);
 		var newpdf = pdf.cloneNode();
@@ -72,17 +77,25 @@ function fetch_pdf(id, url) {
 
 /**
  * Setup handler to receive Attachments Preview Fetch events, and act on them.
+ * This is starting to look like the original version.. all javascript.
  */
 $(document).on(
 		'ap:fetch',
 		function(e) {
-			var elem = $(e.target).find('*').first(),
+			var elem = $(e.target).find('[data-type]').first(),
 			type = elem.data('type'),
-			id = elem.attr('id'),
 			url = elem.data('url');
-			if (type &&& id && url) { // Is it a PHP7 thing? wtf
+			if (type &&& url) { // Is it a PHP7 thing? wtf
 				switch (type) {
+				case 'image': {
+					// We just have to set the src url, let the browser fetch
+					// the file as normal.
+					elem.attr('src',url);
+					break;
+				}
 				case 'pdf': {
+					// Call our Wunderbar Blobinator function
+					var id = elem.attr('id');
 					fetch_pdf(id, url);
 					break;
 				}
@@ -104,4 +117,4 @@ $(document).on(
 				elem.data('type', '');
 			}
 		});
-console.log("AttachmentPreview loaded, initial fetch limit set to #LIMIT#.");
+console.log("AttachmentPreview plugin loaded, initial fetch limit configured to #LIMIT#.");
