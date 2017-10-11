@@ -948,8 +948,8 @@ class AttachmentPreviewPlugin extends Plugin {
         // If something has been POST'd to osTicket, assume we're not Viewing a ticket
         $tickets_view = FALSE;
       }
-      elseif (strpos($url, 'a=edit')) {
-        // URL contains a=edit, which we don't want to change yet
+      elseif (strpos($url, 'a=edit') || strpos($url, 'a=print')) {
+        // URL contains a=edit or a=print, so assume we aren't needed here!
         $tickets_view = FALSE;
       }
       elseif (strpos($url, 'index.php') !== FALSE ||
