@@ -36,7 +36,12 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
           'default' => TRUE,
           'hint' => 'Check to enable attachments inline, uncheck only allows the API to function.'
         ]),
-      
+        'attachment-size' => new TextboxField(
+        [
+          'label' => $__('Max Size'),
+          'default' => 1024,
+          'hint' => 'Enter maximum Kilobytes of an attachment to inline. Larger attachments are ignored.'
+        ]),      
       'attach-pdf' => new BooleanField(
         [
           'label' => $__('Inline PDF files as <object>s'),
