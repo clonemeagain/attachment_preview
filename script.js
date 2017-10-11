@@ -29,7 +29,7 @@ $(document).on('ready pjax:success', function() {
 function ap_toggle(item, key) {
 	var i = $(item), elem = $('#' + key);
 	elem.slideToggle();
-	if (i.text() == '$hide') {
+	if (i.text() === '$hide') {
 		i.text('#SHOW#');
 	} else {
 		elem.trigger('ap:fetch');
