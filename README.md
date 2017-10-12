@@ -1,6 +1,8 @@
 # Attachment Preview
 An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of Attachments
 
+[![Build Status](https://travis-ci.org/clonemeagain/attachment_preview.svg?branch=master)](https://travis-ci.org/clonemeagain/attachment_preview)
+
 #How it looks:
 ![agent_view](https://cloud.githubusercontent.com/assets/5077391/15166401/bedd01fc-1761-11e6-8814-178c7d4efc03.png)
 
