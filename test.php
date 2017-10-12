@@ -11,4 +11,4 @@ if (php_sapi_name() !== 'cli') {
 // ticket with an attachment.. fark. Might have to build the database as an 
 // SQL file and chuck it in a test subfolder.. strewth. 
 
-return TRUE;
+exit(0); // that's good right?
