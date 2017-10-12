@@ -12,7 +12,7 @@ before_script:
   - echo 'date.timezone = "Europe/Paris"' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
  
 script: 
-  - test.php
+  - php test.php
 
 notifications:
   - email:
