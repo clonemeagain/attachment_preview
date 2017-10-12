@@ -1,0 +1,19 @@
+language: php
+php:
+  - '5.6'
+  - '7.1'
+
+matrix:
+  - fast_finish: true
+
+
+before_script:
+  - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
+  - echo 'date.timezone = "Europe/Paris"' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
+ 
+script: 
+  - php test.php
+
+notifications:
+  - email:
+    - clonemeagain@gmail.com
