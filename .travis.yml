@@ -13,3 +13,7 @@ before_script:
  
 script: 
   - test.php
+
+notifications:
+  - email:
+    - clonemeagain@gmail.com
