@@ -5,15 +5,11 @@ php:
 
 matrix:
   - fast_finish: true
-
+  
+install:
+  - wget https://github.com/osTicket/osTicket/archive/v1.10.1.tar.gz -O ot.tgz
+  - tar xvf ot.tgz && mv osTicket-1.10.1 ../osticket
 
 before_script:
   - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
   - echo 'date.timezone = "Europe/Paris"' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
- 
-script: 
-  - php test.php
-
-notifications:
-  - email:
-    - clonemeagain@gmail.com

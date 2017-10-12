@@ -35,7 +35,7 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @var string
      */
-    const DEBUG = TRUE;
+    const DEBUG = FALSE;
 
     /**
      * An array of messages to be logged. This plugin is called before $ost is
@@ -570,7 +570,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param string $url
      * @return mixed Youtube video ID or FALSE if not found
      */
-    private function getYoutubeIdFromUrl($url) {
+    public function getYoutubeIdFromUrl($url) {
         // Series of possible url patterns, please pull-request any others you find!
         // Ideally they are in "most-common" first order.
         // Note the match group's around the ID of the video
@@ -960,43 +960,42 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return bool whether or not current page is viewing a ticket.
      */
     public static function isTicketsView() {
-        static $tickets_view;
+        $tickets_view = FALSE;
         $url = $_SERVER['REQUEST_URI'];
 
         // Only checks it once per pageload
-        if (!isset($tickets_view)) {
-            // Run through the most likely candidates first:
-            // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
-            if (isset($_POST['a']) && $_POST['a'] == 'open') {
-                $tickets_view = TRUE;
-            }
-            elseif (strpos($url, '/scp/') === FALSE) {
-                // URL doesn't include /scp/ so isn't an agent page
-                $tickets_view = FALSE;
-            }
-            elseif (isset($_POST) && count($_POST)) {
-                // If something has been POST'd to osTicket, assume we're not Viewing a ticket
-                $tickets_view = FALSE;
-            }
-            elseif (strpos($url, 'a=edit') || strpos($url, 'a=print')) {
-                // URL contains a=edit or a=print, so assume we aren't needed here!
-                $tickets_view = FALSE;
-            }
-            elseif (strpos($url, 'index.php') !== FALSE ||
-                    strpos($url, 'tickets.php') !== FALSE) {
-                // Might be a ticket page..
-                $tickets_view = TRUE;
-            }
-            else {
-                // Default
-                $tickets_view = FALSE;
-            }
-
-            if (self::DEBUG) {
-                error_log(
-                        "Matched $url as " . ($tickets_view ? 'ticket' : 'not ticket'));
-            }
+        // Run through the most likely candidates first:
+        // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
+        if (isset($_POST['a']) && $_POST['a'] == 'open') {
+            $tickets_view = TRUE;
         }
+        elseif (strpos($url, '/scp/') === FALSE) {
+            // URL doesn't include /scp/ so isn't an agent page
+            $tickets_view = FALSE;
+        }
+        elseif (isset($_POST) && count($_POST)) {
+            // If something has been POST'd to osTicket, assume we're not Viewing a ticket
+            $tickets_view = FALSE;
+        }
+        elseif (strpos($url, 'a=edit') || strpos($url, 'a=print')) {
+            // URL contains a=edit or a=print, so assume we aren't needed here!
+            $tickets_view = FALSE;
+        }
+        elseif (strpos($url, 'index.php') !== FALSE ||
+                strpos($url, 'tickets.php') !== FALSE) {
+            // Might be a ticket page..
+            $tickets_view = TRUE;
+        }
+        else {
+            // Default
+            $tickets_view = FALSE;
+        }
+
+        if (self::DEBUG) {
+            error_log(
+                    "Matched $url as " . ($tickets_view ? 'ticket' : 'not ticket'));
+        }
+
         return $tickets_view;
     }
 
@@ -1017,8 +1016,7 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @see Plugin::uninstall()
      */
-    function uninstall() {
-        $errors = [];
+    function uninstall(&$errors) {
         parent::uninstall($errors);
     }
 
