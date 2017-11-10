@@ -29,7 +29,7 @@ $(document).on('ready pjax:success', function() {
 function ap_toggle(item, key) {
 	var i = $(item), elem = $('#' + key);
 	elem.slideToggle();
-	if (i.text() === '$hide') {
+	if (i.text() === '#HIDE#') {
 		i.text('#SHOW#');
 	} else {
 		elem.trigger('ap:fetch');
@@ -46,11 +46,12 @@ function ap_toggle(item, key) {
  * @param url of the file to convert into a Blob and inject
  */
 function fetch_pdf(id, url) {
+        var pdf = document.getElementById(id);
 	if (/* @cc_on!@ */false || !!document.documentMode) {
-		// IE still cant display a PDF inside an <object>,
-		// so, we'll delete it..
+		// IE still cant display a PDF inside an <object>
 		console.log("Why Microsoft?");
-		$('#' + id).remove();
+                var b = $(pdf).contents();
+                $(pdf).replaceWith(b);
 		return;
 	}
 	var req = new XMLHttpRequest();
@@ -63,12 +64,15 @@ function fetch_pdf(id, url) {
 		});
 		// Convert the binary blob of PDF data into an Object URL
 		var object_url = (window.URL || window.webkitURL).createObjectURL(blob);
-		var pdf = document.getElementById(id);
+                if(!object_url){
+                    return;
+                }
+		
 		var newpdf = pdf.cloneNode();
+                newpdf.setAttribute('data', object_url);
 
-		newpdf.setAttribute('data', object_url);
-		// Replace the node with our new one which displays it:
-		pdf.parentNode.replaceChild(newpdf, pdf);
+                // Replace the node with our new one which displays it:
+                pdf.parentNode.replaceChild(newpdf, pdf);
 		// prevent repeated fetch events from re-fetching
 		delete newpdf.dataset.type;
 	};
