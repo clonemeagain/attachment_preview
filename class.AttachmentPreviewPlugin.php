@@ -403,7 +403,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $pdf = $doc->createElement('object');
         $pdf->setAttribute('width', '100%');
         $pdf->setAttribute('height', '1000px'); // Arbitrary height
-        // $pdf->setAttribute('data', $url . '&disposition=inline'); // Can't use inline disposition with XSS security rules.. :-(
+        $pdf->setAttribute('data','');//$url . '&disposition=inline'); // Can't use inline disposition with XSS security rules.. :-(
         $pdf->setAttribute('type', 'application/pdf');
         $pdf->setAttribute('data-type', 'pdf');
         $pdf->setAttribute('data-url', $link->getAttribute('href'));
