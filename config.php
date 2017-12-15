@@ -90,13 +90,22 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
       'show-initially' => new ChoiceField(
         [
           'label' => $__('Number of attachments to show initially'),
-          'default' => 0,
           'hint' => $__(
             'If you find too many attachments displaying at once is slowing you down, change this to only show some of them at first.'),
-          'choices' => array_merge([
-            '0' => $__('All')
-          ], array_combine(range(1, 100), range(1, 100)))
-        ])
-    ];
+        'choices' =>
+                [
+                    '1'    => '1',
+                    '2'    => '2',
+                    '3'    => '3',
+                    '4'    => '4',
+                    '5'    => '5',
+                    '6'    => '6',
+                    '7'    => '7',
+                    '8'    => '8',
+                    '9'    => '9',
+                    '10'   => '10',
+                ]
+                    ])
+        ];
   }
 }
