@@ -539,7 +539,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $wrapper->appendChild($new_child);
 
         // See if we are over the admin-defined maximum number of inline-attachments:
-        if ($limit == 0 || $number <= $limit) {
+        if ($limit == "ALL" || $number <= $limit) {
             // Not limited, just add a class to received our styles
             $wrapper->setAttribute('class', 'ap_embedded');
         }
