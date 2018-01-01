@@ -661,7 +661,7 @@ class AttachmentPreviewPlugin extends Plugin {
         // Log to system, if available
         global $ost;
 
-        if (is_array($args) AND count($args > 1)) {
+        if (is_array($args) AND count($args) > 1) {
             $text = vsprintf($text, $args);
         }
 
