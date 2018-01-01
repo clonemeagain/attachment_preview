@@ -644,7 +644,7 @@ class AttachmentPreviewPlugin extends Plugin {
     /**
      * Wrapper around log method
      */
-    private function debug_log(...$args) {
+    private function debug_log($args) {
         if (self::DEBUG) {
             $text = array_shift($args);
             $this->log($text, $args);
@@ -657,12 +657,12 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param string $text
      * @param mixed $args
      */
-    private function log($text, ...$args) {
+    private function log($text, $args=null) {
         // Log to system, if available
         global $ost;
 
-        if (func_num_args() > 1) {
-            $text = vsprintf($text, ...$args);
+        if (is_array($args) AND count($args > 1)) {
+            $text = vsprintf($text, $args);
         }
 
         if (!$ost instanceof osTicket) {
