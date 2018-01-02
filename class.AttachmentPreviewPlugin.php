@@ -214,7 +214,7 @@ class AttachmentPreviewPlugin extends Plugin {
                 // Luckily, the attachment link contains the filename.. which we can use!
                 // Grab the extension of the file from the filename:
                 $ext          = $this->getExtension($link->textContent);
-                $size_element = $xpath->query("following-sibling::*[1]", $link)[0];
+                $size_element = $xpath->query("following-sibling::*[1]", $link)->item[0];
                 if ($size_element instanceof DomElement) {
                     $size_kb = $this->unFormatSize($size_element->nodeValue);
                     $this->debug_log("Attachment is roughly: " . $size_kb . ' bytes in size.');
