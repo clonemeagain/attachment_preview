@@ -644,25 +644,35 @@ class AttachmentPreviewPlugin extends Plugin {
     /**
      * Wrapper around log method
      */
-    private function debug_log($args) {
+    private function debug_log($text, $_=null) {
         if (self::DEBUG) {
+            $args = func_get_args();
             $text = array_shift($args);
-            $this->log($text, $args);
+            $this->log($text, $args); // send variable amount of args as array
         }
     }
 
-    /**
+        /**
      * Supports variable replacement of $text using sprintf macros
      *
-     * @param string $text
-     * @param mixed $args
+     * @param string $text with sprintf macros
+     * @param $_ any number of params for the macros
      */
-    private function log($text, $args=null) {
+    private function log($text, $_=null) {
         // Log to system, if available
         global $ost;
 
-        if (is_array($args) AND count($args) > 1) {
-            $text = vsprintf($text, $args);
+        $args = func_get_args(); 
+        $format = array_shift($args);
+        if(!$format){
+            return;
+        }
+        if(is_array($args[0])){ // handle debug_log or array of variables
+            $text = vsprintf($format,$args[0]);
+        }elseif(count($args)){ // handle normal variables as arguments
+            $text = vsprintf($format,$args);
+        }else{// no variables passed
+            $text = $format;
         }
 
         if (!$ost instanceof osTicket) {
