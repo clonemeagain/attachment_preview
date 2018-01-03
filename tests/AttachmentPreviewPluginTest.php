@@ -159,4 +159,47 @@ final class AttachmentPreviewPluginTest extends TestCase {
         $this->assertSame(AttachmentPreviewPlugin::isPjax(), TRUE);
     }
 
+    /**
+     * Does our function work?
+     * @dataProvider getByteSizedStrings
+     */
+    public function testUnformatSize($input, $expected) {
+        $out = $this->invokeMethod($this->plugin, 'unFormatSize', array($input));
+        $this->assertEquals($out, $expected);
+    }
+
+    /**
+     * Naively assumes the string is a MB rather than MiB type data-size
+     */
+    public function getByteSizedStrings() {
+
+        return [
+            // osticket string representation of size, number of bytes
+            ['1 bytes', 1],
+            ['444 bytes', 444],
+            ['1 kb', 1024],
+            ['122 kb', 124928],
+            ['1 mb', 1048576],
+            ['12 mb', 12582912]
+        ];
+    }
+
+    /**
+     * Call protected/private method of a class.
+     *
+     * @param object &$object    Instantiated object that we will run method on.
+     * @param string $methodName Method name to call
+     * @param array  $parameters Array of parameters to pass into method.
+     *
+     * @return mixed Method return.
+     * @see https://jtreminio.com/2013/03/unit-testing-tutorial-part-3-testing-protected-private-methods-coverage-reports-and-crap/
+     */
+    public function invokeMethod(&$object, $methodName, array $parameters = array()) {
+        $reflection = new \ReflectionClass(get_class($object));
+        $method     = $reflection->getMethod($methodName);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs($object, $parameters);
+    }
+
 }
