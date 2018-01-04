@@ -760,11 +760,11 @@ class AttachmentPreviewPlugin extends Plugin {
         // Note the selector selects the first <div> which is what we injected two lines up:
         $structures = array();
         foreach ($dom->getElementsByTagName('div')->item(0)->childNodes as $node) {
-            $structures[] = (object) [
+            $structures[] = (object) array(
                         'element'    => $node,
                         'locator'    => $locator,
                         'expression' => $expression
-            ];
+            );
         }
         if (count($structures)) {
             self::$foreign_elements['raw-' . $foreigners++] = $structures;
