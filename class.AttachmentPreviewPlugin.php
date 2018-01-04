@@ -215,11 +215,11 @@ class AttachmentPreviewPlugin extends Plugin {
                 // Grab the extension of the file from the filename:
                 $ext          = $this->getExtension($link->textContent);
                 $size_element = $xpath->query("following-sibling::*[1]", $link)->item(0);
-                
+
                 if ($size_element instanceof DomElement) {
-                    $size_b = $this->unFormatSize($size_element->nodeValue);
+                    $size_b  = $this->unFormatSize($size_element->nodeValue);
                     $this->debug_log("$ext is roughly: $size_b bytes in size.");
-                    $size_kb = $size_b / 1024; 
+                    $size_kb = $size_b / 1024;
                     if ($size_kb > (int) $config->get('attachment-size')) {
                         // Skip this one, got a bit of an ass on it!
                         $this->debug_log("Skipping attachment, size filter");
@@ -238,10 +238,7 @@ class AttachmentPreviewPlugin extends Plugin {
                 if (method_exists($this, $func)) {
                     $this->debug_log("Calling %s for %s", $func, $link->getAttribute('href'));
                     // Call the method to insert the linked attachment into the DOM:
-                    call_user_func([
-                        $this,
-                        $func
-                            ], $dom, $link);
+                    $this->{$func}($dom,$link);
                 }
             }
             elseif ($config->get('attach-youtube')) {
@@ -405,7 +402,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $pdf = $doc->createElement('object');
         $pdf->setAttribute('width', '100%');
         $pdf->setAttribute('height', '1000px'); // Arbitrary height
-        $pdf->setAttribute('data','');//$url . '&disposition=inline'); // Can't use inline disposition with XSS security rules.. :-(
+        $pdf->setAttribute('data', ''); //$url . '&disposition=inline'); // Can't use inline disposition with XSS security rules.. :-(
         $pdf->setAttribute('type', 'application/pdf');
         $pdf->setAttribute('data-type', 'pdf');
         $pdf->setAttribute('data-url', $link->getAttribute('href'));
@@ -646,7 +643,7 @@ class AttachmentPreviewPlugin extends Plugin {
     /**
      * Wrapper around log method
      */
-    private function debug_log($text, $_=null) {
+    private function debug_log($text, $_ = null) {
         if (self::DEBUG) {
             $args = func_get_args();
             $text = array_shift($args);
@@ -654,26 +651,28 @@ class AttachmentPreviewPlugin extends Plugin {
         }
     }
 
-        /**
+    /**
      * Supports variable replacement of $text using sprintf macros
      *
      * @param string $text with sprintf macros
      * @param $_ any number of params for the macros
      */
-    private function log($text, $_=null) {
+    private function log($text, $_ = null) {
         // Log to system, if available
         global $ost;
 
-        $args = func_get_args(); 
+        $args   = func_get_args();
         $format = array_shift($args);
-        if(!$format){
+        if (!$format) {
             return;
         }
-        if(is_array($args[0])){ // handle debug_log or array of variables
-            $text = vsprintf($format,$args[0]);
-        }elseif(count($args)){ // handle normal variables as arguments
-            $text = vsprintf($format,$args);
-        }else{// no variables passed
+        if (is_array($args[0])) { // handle debug_log or array of variables
+            $text = vsprintf($format, $args[0]);
+        }
+        elseif (count($args)) { // handle normal variables as arguments
+            $text = vsprintf($format, $args);
+        }
+        else {// no variables passed
             $text = $format;
         }
 
@@ -973,7 +972,7 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public static function isTicketsView() {
         $tickets_view = FALSE;
-        $url = $_SERVER['REQUEST_URI'];
+        $url          = $_SERVER['REQUEST_URI'];
 
         // Only checks it once per pageload
         // Run through the most likely candidates first:
