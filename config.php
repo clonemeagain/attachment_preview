@@ -40,7 +40,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
             'attachment-size'      => new TextboxField(array(
                 'label'   => $__('Max Size'),
                 'default' => 1024,
-                'hint'    => 'Enter maximum Kilobytes of an attachment to inline. Larger attachments are ignored.'
+                'hint'    => 'Enter maximum Kilobytes of an attachment to inline. Larger attachments are ignored, use zero (0) to remove limit.'
                     )
             ),
             'attach-pdf'           => new BooleanField(array(
