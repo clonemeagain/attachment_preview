@@ -35,7 +35,7 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @var string
      */
-    const DEBUG = FALSE;
+    const DEBUG = TRUE;
 
     /**
      * An array of messages to be logged. This plugin is called before $ost is
@@ -58,7 +58,42 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @var string
      */
-    private $appended = '';
+    static $appended = '';
+    static $instance = null;
+
+    /**
+     * Explicitly define a constructor, to wrap a $this reference
+     * @param type $id
+     */
+    public function __construct($id) {
+        parent::__construct($id);
+        self::$instance = $this;
+    }
+
+    /**
+     * Replacing the register_shutdown_function's anonymous use of $this
+     * with the object's destructor for PHP5.3
+     */
+    public function __destruct() {
+        if (count($this->messages)) {
+            $this->log_after();
+        }
+    }
+
+    /**
+     * Kinda like a Singleton factory, but without the "factory" part.. 
+     * Relies on the normal bootstrap phase from osTicket to construct the 
+     * only instance we want. 
+     * 
+     * @return type
+     * @throws Exception
+     */
+    public static function getInstance() {
+        if (!self::$instance) {
+            throw new Exception('Invalid use, please wait for the plugins to Bootstrap properly.');
+        }
+        return self::$instance;
+    }
 
     /**
      * Try and do as little as possible in the bootstrap function, as it is called
@@ -80,21 +115,19 @@ class AttachmentPreviewPlugin extends Plugin {
         // Assuming that other plugins want to inject an element or two..
         // Provide a connection point to the attachments.wrapper
         Signal::connect(self::signal_id, function ($object, $data) {
-            $this->debug_log("Received connection from %s", get_class($object));
+            // This debug_log line only works in php5.4+             
+            // $this->debug_log("Received connection from %s", get_class($object));
+            // 
             // Assumes you want to edit the DOM with your structures, and that you've read the docs.
             // Just save them here until the page is done rendering, then we'll make all these changes at once:
             self::$foreign_elements[get_class($object)] = $data;
         });
 
-        // Load our Admin defined settings..
-        $config = $this->getConfig();
-
         // Check what our URI is, if acceptable, add to the output.. :-)
         // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
         // Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
-        if (self::isTicketsView() && $config->get('attachment-enabled')) {
-            $this->debug_log(
-                    "Agent requested a tickets-view: Starting the attachments plugin.");
+        if (self::isTicketsView() && $this->getConfig()->get('attachment-enabled')) {
+            $this->debug_log("Agent requested a tickets-view: Starting the attachments plugin.");
             // We could hack at core, or we can simply capture the whole page output and modify the HTML then..
             // Not "easier", but less likely to break core.. right?
             // There appears to be a few uses of ob_start in the codebase, but they stack, so it works!
@@ -102,49 +135,31 @@ class AttachmentPreviewPlugin extends Plugin {
 
             // This will run after everything else, empties the buffer and runs our code over the HTML
             // Then we send it to the browser as though nothing changed..
-            register_shutdown_function(
-                    function () {
-                $this->debug_log("Shutdown handler for inline attachments running");
-                // Output the buffer
-                // Check for Attachable's and print
-                // Note: This also checks foreign_elements
-                print $this->inlineAttachments(ob_get_clean());
-            });
-
-            // See if there was any HTML to be appended.
-            register_shutdown_function(
-                    function () {
-                $this->debug_log("Shutdown hander appender running");
-                if ($this->appended) {
-                    $this->debug_log("Appender appending appendable HTML");
-                    print $this->appended;
-                }
+            register_shutdown_function(function() {
+                AttachmentPreviewPlugin::shutdownHandler();
             });
         }
-        // Actually, do we want this? 
-        /*
-          else {
-          // The API stands seperate to the ostensible purpose of the plugin.
-          $this->debug_log(
-          "Exposing API as main plugin is disabled or this isn't a tickets-view.");
-          // There might be work to do via Signals.. This would otherwise be ignored as the shutdown handler
-          // is nominally only initiated when enabled.. This allows other plugins to send it jobs. ;-)
-          ob_start();
-          register_shutdown_function(
-          function () {
-          $this->debug_log("Shutdown handler remote work running");
-          // This check is for the add_script and add_arbitrary_html function output as well:
-          if (count(self::$foreign_elements)) {
-          // We've got something to do, let's do it:
-          print $this->doRemoteWork(ob_get_clean());
-          }
-          else {
-          print ob_get_clean();
-          }
-          });
-          }
-         * 
-         */
+    }
+
+    /**
+     * Wrapper around register_shutdown_function to avoid making $this calls from anonymous functions.. 
+     * 
+     * Hopefully the Singleton factory pattern works properly..
+     */
+    public static function shutdownHandler() {
+
+        $plugin = AttachmentPreviewPlugin::getInstance();
+        $plugin->debug_log("Shutdown handler for inline attachments running");
+        // Output the buffer
+        // Check for Attachable's and print
+        // Note: This also checks foreign_elements
+        print $plugin->inlineAttachments(ob_get_clean());
+
+        // See if there was any HTML to be appended.
+        if ($plugin->appended) {
+            $plugin->debug_log("Appender appending appendable HTML");
+            print $plugin->appended;
+        }
     }
 
     /**
@@ -681,12 +696,6 @@ class AttachmentPreviewPlugin extends Plugin {
         if (!$ost instanceof osTicket) {
             // doh, can't log to the admin log without this object
             // setup a callback to do the logging afterwards:
-            if (!$this->messages) {
-                register_shutdown_function(
-                        function () {
-                    $this->log_after();
-                });
-            }
             // save the log message in memory for now
             // the callback registered above will retrieve it and log it
             $this->messages[] = $text;
@@ -808,7 +817,8 @@ class AttachmentPreviewPlugin extends Plugin {
         if (self::DEBUG) {
             error_log("Received html append");
         }
-        $this->appended .= $html;
+        //$plugin           = self::getInstance();
+        self::$appended .= $html;
     }
 
     /**
@@ -973,8 +983,13 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return bool whether or not current page is viewing a ticket.
      */
     public static function isTicketsView() {
-        $tickets_view = FALSE;
-        $url          = $_SERVER['REQUEST_URI'];
+        static $tickets_view = null;
+
+        // short-circuit check for repeated calls:
+        if (!is_null($tickets_view)) {
+            return $tickets_view;
+        }
+        $url = $_SERVER['REQUEST_URI'];
 
         // Only checks it once per pageload
         // Run through the most likely candidates first:
