@@ -983,15 +983,9 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return bool whether or not current page is viewing a ticket.
      */
     public static function isTicketsView() {
-        static $tickets_view = null;
-
-        // short-circuit check for repeated calls:
-        if (!is_null($tickets_view)) {
-            return $tickets_view;
-        }
+        $tickets_view = false;
         $url = $_SERVER['REQUEST_URI'];
 
-        // Only checks it once per pageload
         // Run through the most likely candidates first:
         // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
         if (isset($_POST['a']) && $_POST['a'] == 'open') {
