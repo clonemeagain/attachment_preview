@@ -108,7 +108,12 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
                     "ALL"  => $__('All') // Woo.
                 )
                     )
-            )
+            ),
+            'newtab-links'         => new BooleanField(array(
+                'label'   => $__('Open attachment links in new tab'),
+                'default' => FALSE,
+                'hint'    => $__('Rewrites links to files instructing the browser to open them in a new window/tab based on browser settings, instead of opening in the same window.')
+                    ))
         );
     }
 

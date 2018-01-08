@@ -224,19 +224,42 @@ class AttachmentPreviewPlugin extends Plugin {
         // Let's not get regex happy.. we all have the tendency.. :-)
         $dom   = self::getDom($html);
         $xpath = new DOMXPath($dom);
+        // $xpath->registerNamespace('html', 'http://www.w3.org/1999/xhtml');
 
         $links_seen          = 0;
         $attachments_inlined = 0;
 
+        $rewrite_youtube = (bool) $config->get('attach-youtube'); // cache responses
+        $rewrite_links   = (bool) $config->get('newtab-links');
+
         // Find all <a> elements: http://stackoverflow.com/a/29272222 as DOMElement's
-        foreach ($xpath->query("//a") as $link) { // 5.3 compatible version, 5.4+ =>  $dom->getElementsByTagName('a')
+        foreach ($dom->getElementsByTagName('a') as $link) {
             // All links.. could be messy
             $this->debug_log("Saw link: %s", $link->textContent);
             $links_seen ++;
+
             // Check the link points to osTicket's "attachments" provider:
             // osTicket uses /file.php for all attachments
+            // we could have used XPATH: //a[@class="file"] however, that would break the youtube one.
             if (strpos($link->getAttribute('href'), '/file.php') !== FALSE) {
+                if ($rewrite_links && !$link->getAttribute('target')) {
+                    $this->debug_log("CHANGING ATTRIBUTE OF ATTACHMENT LINK");
+                    // Set the target attribute of the attachment link to _blank to make the browser open in new-window/tab
+                    // Have to do it before we append to this element.
+                    // Rebuild the link with the attributes we want.. ffs DOM
+                    $new_link      = $dom->createElement('a', $link->nodeValue);
+                    $new_link->setAttribute('href', $link->getAttribute('href'));
+                    $new_link->setAttribute('class', $link->getAttribute('class'));
+                    $new_link->setAttribute('target', '_blank');
+                    // Simply using NodeElement::replaceChild on the $link's parent element didn't work.. 
+                    // So.. Let's get creative. 
+                    // We want to put it before the <em> element containing the size.. 
+                    $em_to_prepend = $link->nextSibling;
+                    $link->parentNode->insertBefore($new_link, $em_to_prepend);
 
+                    // If we delete it now, we can't use it to inject the attachment.., so, we delete later.
+                    // $link->parentNode->removeChild($link);
+                }
                 // Luckily, the attachment link contains the filename.. which we can use!
                 // Grab the extension of the file from the filename:
                 $ext        = $this->getExtension($link->textContent);
@@ -270,8 +293,12 @@ class AttachmentPreviewPlugin extends Plugin {
                     $this->{$func}($dom, $link);
                     $attachments_inlined++;
                 }
+
+                if ($rewrite_links) {
+                    $link->parentNode->removeChild($link);
+                }
             }
-            elseif ($config->get('attach-youtube')) {
+            elseif ($rewrite_youtube) {
                 // This link isn't to /file.php & admin have asked us to check if it is a youtube link.
                 // The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
                 if (strpos($link->getAttribute('href'), 'youtub') !== FALSE) {
@@ -637,6 +664,8 @@ class AttachmentPreviewPlugin extends Plugin {
         $p->debug_log("Loading HTML into DOM object.");
         $dom                      = new \DOMDocument('1.0', 'UTF-8');
         $dom->validateOnParse     = true;
+        $dom->resolveExternals    = true;
+        $dom->preserveWhiteSpace  = false;
         // Turn off XML errors.. if only it was that easy right?
         $dom->strictErrorChecking = FALSE;
         libxml_use_internal_errors(true);
