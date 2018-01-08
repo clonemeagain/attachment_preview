@@ -214,14 +214,21 @@ class AttachmentPreviewPlugin extends Plugin {
             return $html;
         }
 
+        $this->debug_log("Looking for linked files with ext: " . implode(',', array_values($allowed_extensions)));
+
+
         // Let's not get regex happy.. we all have the tendency.. :-)
         $dom   = self::getDom($html);
         $xpath = new DOMXPath($dom);
 
-
+        $links_seen          = 0;
+        $attachments_inlined = 0;
 
         // Find all <a> elements: http://stackoverflow.com/a/29272222 as DOMElement's
-        foreach ($dom->getElementsByTagName('a') as $link) {
+        foreach ($xpath->query("//a") as $link) { // 5.3 compatible version, 5.4+ =>  $dom->getElementsByTagName('a')
+            // All links.. could be messy
+            $this->debug_log("Saw link: %s", $link->textContent);
+            $links_seen ++;
             // Check the link points to osTicket's "attachments" provider:
             // osTicket uses /file.php for all attachments
             if (strpos($link->getAttribute('href'), '/file.php') !== FALSE) {
@@ -230,20 +237,21 @@ class AttachmentPreviewPlugin extends Plugin {
                 // Grab the extension of the file from the filename:
                 $ext        = $this->getExtension($link->textContent);
                 if ($size_limit = (int) $config->get('attachment-size') && $size_limit) {
+                    $this->debug_log("size filter found: %b kb", $size_limit);
                     $size_element = $xpath->query("following-sibling::*[1]", $link)->item(0);
 
                     if ($size_element instanceof DomElement) {
                         $size_b  = $this->unFormatSize($size_element->nodeValue);
-                        $this->debug_log("$ext is roughly: $size_b bytes in size.");
+                        $this->debug_log("%s is roughly: %d bytes in size.", $ext, $size_b);
                         $size_kb = $size_b / 1024;
                         if ($size_kb > $size_limit) {
                             // Skip this one, got a bit of an ass on it!
-                            $this->debug_log("Skipping attachment, size filter");
+                            $this->debug_log("Skipping attachment, size filter restricted it.");
                             continue;
                         }
                     }
                 }
-                $this->debug_log("Attempting to add $ext file.");
+                $this->debug_log("Attempting to add %s file.", $ext);
 
                 // See if admin allowed us to inject files with this extension:
                 if (!$ext || !isset($allowed_extensions[$ext])) {
@@ -256,6 +264,7 @@ class AttachmentPreviewPlugin extends Plugin {
                     $this->debug_log("Calling %s for %s", $func, $link->getAttribute('href'));
                     // Call the method to insert the linked attachment into the DOM:
                     $this->{$func}($dom, $link);
+                    $attachments_inlined++;
                 }
             }
             elseif ($config->get('attach-youtube')) {
@@ -263,9 +272,13 @@ class AttachmentPreviewPlugin extends Plugin {
                 // The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
                 if (strpos($link->getAttribute('href'), 'youtub') !== FALSE) {
                     $this->add_youtube($dom, $link);
+                    $attachments_inlined++;
                 }
             }
         }
+
+        $this->debug_log("Saw %d link elements in the osTicket page.", $links_seen);
+        $this->debug_log("Inlined: %d attachment[s].", $attachments_inlined);
 
         // Before we return this, let's see if any foreign_elements have been provided by other plugins, we'll insert them.
         // This allows those plugins to edit this plugin.. seat-of-the-pants stuff!
@@ -616,7 +629,10 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return \DOMDocument
      */
     public static function getDom($html = '') {
+        $p                        = self::getInstance();
+        $p->debug_log("Loading HTML into DOM object.");
         $dom                      = new \DOMDocument('1.0', 'UTF-8');
+        $dom->validateOnParse     = true;
         // Turn off XML errors.. if only it was that easy right?
         $dom->strictErrorChecking = FALSE;
         libxml_use_internal_errors(true);
@@ -632,8 +648,26 @@ class AttachmentPreviewPlugin extends Plugin {
         }
 
         // Convert the HTML into a DOMDocument, however, don't imply it's HTML, and don't insert a default Document Type Template
-        @$dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        // Note, we can't use the Options parameter until PHP 5.4 http://php.net/manual/en/domdocument.loadhtml.php
+        $loaded = false;
+        if (version_compare(PHP_VERSION, '5.4', '>=')) {
+            $loaded = $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        }
+        else {
+            $loaded = $dom->loadHTML($html);
+        }
+        if (!$loaded) {
+            if (DEBUG) {
+                $error = libxml_get_errors();
+                print_r($error);
+            }
+            $p->debug_log("There was a problem loading the DOM.");
+        }
+        else {
+            $p->debug_log("%d chars of HTML was inserted into a DOM", strlen($html));
+        }
         libxml_use_internal_errors(FALSE); // restore xml parser error handlers
+        $p->debug_log('DOM Loaded.');
         return $dom;
     }
 
@@ -645,6 +679,8 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return mixed|string
      */
     public static function printDom(DOMDocument $dom) {
+        $p        = self::getInstance();
+        $p->debug_log("Printing the DOM as HTML");
         // Check for failure to generate HTML
         // DOMDocument::saveHTML() returns null on error
         $new_html = $dom->saveHTML();
@@ -984,7 +1020,7 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public static function isTicketsView() {
         $tickets_view = false;
-        $url = $_SERVER['REQUEST_URI'];
+        $url          = $_SERVER['REQUEST_URI'];
 
         // Run through the most likely candidates first:
         // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
@@ -1047,6 +1083,19 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public function getForm() {
         return array();
+    }
+
+}
+
+if (!function_exists('xmltree_dump')) {
+
+    function xmltree_dump(DOMNode $node) {
+        $iterator  = new DOMRecursiveIterator($node);
+        $decorated = new DOMRecursiveDecoratorStringAsCurrent($iterator);
+        $tree      = new RecursiveTreeIterator($decorated);
+        foreach ($tree as $key => $value) {
+            echo $value . "\n";
+        }
     }
 
 }
