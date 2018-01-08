@@ -59,10 +59,15 @@ class AttachmentPreviewPlugin extends Plugin {
      * @var string
      */
     static $appended = '';
+
+    /**
+     * Singleton reference to itself, used for static functions to find the one object.
+     * @var type 
+     */
     static $instance = null;
 
     /**
-     * Explicitly define a constructor, to wrap a $this reference
+     * Explicitly define a constructor, to wrap a $this reference as $instance
      * @param type $id
      */
     public function __construct($id) {
@@ -72,7 +77,7 @@ class AttachmentPreviewPlugin extends Plugin {
 
     /**
      * Replacing the register_shutdown_function's anonymous use of $this
-     * with the object's destructor for PHP5.3
+     * with the object's destructor for PHP5.3 compatibility
      */
     public function __destruct() {
         if (count($this->messages)) {
@@ -81,7 +86,7 @@ class AttachmentPreviewPlugin extends Plugin {
     }
 
     /**
-     * Kinda like a Singleton factory, but without the "factory" part.. 
+     * Singleton pattern
      * Relies on the normal bootstrap phase from osTicket to construct the 
      * only instance we want. 
      * 
@@ -147,7 +152,6 @@ class AttachmentPreviewPlugin extends Plugin {
      * Hopefully the Singleton factory pattern works properly..
      */
     public static function shutdownHandler() {
-
         $plugin = AttachmentPreviewPlugin::getInstance();
         $plugin->debug_log("Shutdown handler for inline attachments running");
         // Output the buffer
@@ -289,7 +293,7 @@ class AttachmentPreviewPlugin extends Plugin {
         // just return the original if error
         $modified_html = self::printDom($dom);
         if (!$modified_html) {
-            $this->log("Error manipulating the DOM");
+            $this->log("Error manipulating the DOM, original returned.");
             return $html;
         }
         // The edited HTML can be sent to the browser (end of shutdown_handler calls print)
@@ -521,10 +525,10 @@ class AttachmentPreviewPlugin extends Plugin {
     private function wrap(DOMDocument $doc, DOMElement $source, DOMElement $new_child) {
         // Implement a limit for attachments. Only show the admin configured amount at first
         // if there are any more, we will inject them, however they will be shown as buttons
-        static $number;
-        static $limit;
+        static $number = 0;
+        static $limit  = 0;
 
-        if (!isset($number)) {
+        if (!$number) {
             $number         = 1;
             // Fetch the attachment limit from the config for later
             $limit          = $this->getConfig()->get('show-initially');
@@ -623,7 +627,7 @@ class AttachmentPreviewPlugin extends Plugin {
     }
 
     /**
-     * Converts and HTML string into a DOMDocument.
+     * Converts an HTML string into a DOMDocument.
      *
      * @param string $html
      * @return \DOMDocument
@@ -672,15 +676,14 @@ class AttachmentPreviewPlugin extends Plugin {
     }
 
     /**
-     * Wrapper around DOMDocument::saveHTHML() that strips any pjax prefix we
-     * added Ensure you check for null!
+     * Gets the DOM back as HTML
      *
      * @param DOMDocument $dom
      * @return mixed|string
      */
     public static function printDom(DOMDocument $dom) {
         $p        = self::getInstance();
-        $p->debug_log("Printing the DOM as HTML");
+        $p->debug_log("Converting the DOM back to HTML");
         // Check for failure to generate HTML
         // DOMDocument::saveHTML() returns null on error
         $new_html = $dom->saveHTML();
@@ -694,7 +697,7 @@ class AttachmentPreviewPlugin extends Plugin {
     }
 
     /**
-     * Wrapper around log method
+     * Wrapper around log method that checks for DEBUG first.
      */
     private function debug_log($text, $_ = null) {
         if (self::DEBUG) {
@@ -719,13 +722,16 @@ class AttachmentPreviewPlugin extends Plugin {
         if (!$format) {
             return;
         }
-        if (is_array($args[0])) { // handle debug_log or array of variables
+        if (is_array($args[0])) {
+            // handle debug_log's version or array of variables passed
             $text = vsprintf($format, $args[0]);
         }
-        elseif (count($args)) { // handle normal variables as arguments
+        elseif (count($args)) {
+            // handle normal variables as arguments
             $text = vsprintf($format, $args);
         }
-        else {// no variables passed
+        else {
+            // no variables passed
             $text = $format;
         }
 
@@ -795,7 +801,10 @@ class AttachmentPreviewPlugin extends Plugin {
 
         if (self::DEBUG) {
             // note: static function can't call $this->debug_log()
-            error_log("Received arbitrary HTML injection");
+            if (self::DEBUG) {
+                $p = self::getInstance();
+                $p->debug_log("Received %d chars of arbitrary HTML", strlen($html));
+            }
         }
 
         // Wrap in a <div> then check for children of it immediately after:
@@ -804,7 +813,7 @@ class AttachmentPreviewPlugin extends Plugin {
         // Now everything that they added can be injected as a "Foreign Element"
         // Note the selector selects the first <div> which is what we injected two lines up:
         $structures = array();
-        foreach ($dom->getElementsByTagName('div')->item(0)->childNodes as $node) {
+        foreach ($dom->getElementsByTagName('div')->item(0)->childNodes as $node) { //Might fail on 5.3
             $structures[] = (object) array(
                         'element'    => $node,
                         'locator'    => $locator,
@@ -826,7 +835,8 @@ class AttachmentPreviewPlugin extends Plugin {
     public static function add_arbitrary_script($script) {
         static $script_count = 1;
         if (self::DEBUG) {
-            error_log("Received arbitrary script injection");
+            $p = self::getInstance();
+            $p->debug_log("Received %d chars of arbitrary script injection", strlen($script));
         }
         $dom                       = new DOMDocument();
         $script_element            = $dom->createElement('script');
@@ -851,7 +861,8 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public static function appendHtml($html) {
         if (self::DEBUG) {
-            error_log("Received html append");
+            $p = self::getInstance();
+            $p->debug_log("Received %d chars of HTML to append", strlen($html));
         }
         //$plugin           = self::getInstance();
         self::$appended .= $html;
@@ -1008,10 +1019,13 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return string
      */
     public static function getExtension($string) {
+        // Why reinvent the wheel? 
         return trim(strtolower(pathinfo($string, PATHINFO_EXTENSION)));
     }
 
     /**
+     * Determines based on the current URI if the page is a tickets page or not.
+     * 
      * We only want to inject when viewing tickets, not when EDITING tickets.. or
      * any other view. Available statically via:
      * AttachmentPreviewPlugin::isTicketsView()
@@ -1083,19 +1097,6 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public function getForm() {
         return array();
-    }
-
-}
-
-if (!function_exists('xmltree_dump')) {
-
-    function xmltree_dump(DOMNode $node) {
-        $iterator  = new DOMRecursiveIterator($node);
-        $decorated = new DOMRecursiveDecoratorStringAsCurrent($iterator);
-        $tree      = new RecursiveTreeIterator($decorated);
-        foreach ($tree as $key => $value) {
-            echo $value . "\n";
-        }
     }
 
 }
