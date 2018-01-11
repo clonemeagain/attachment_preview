@@ -1,4 +1,4 @@
-#!/bin/env sh
+#!/usr/bin/bash
 set -ev
 
 # This is the parent project's repository
