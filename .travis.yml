@@ -1,4 +1,8 @@
 language: php
+env: 
+  - OSTICKET_VERSION=1.9
+  - OSTICKET_VERSION=1.10.1
+  
 matrix:
   include:
     - php: 5.3
@@ -7,10 +11,13 @@ matrix:
     - php: 5.6
     - php: 7.1
   fast_finish: true
+  allow_failures:
+    - php: 5.3
+      env: OSTICKET_VERSION=1.10.1
 
 install:
-  - wget https://github.com/osTicket/osTicket/archive/v1.10.1.tar.gz -O ot.tgz
-  - tar xvf ot.tgz && mv osTicket-1.10.1 ../osticket
+  - wget "https://github.com/osTicket/osTicket/archive/v${OSTICKET_VERSION}.tar.gz" -O ot.tgz
+  - tar xvf ot.tgz && mv osTicket-${OSTICKET_VERSION} ../osticket
 
 before_script:
   - phpenv config-rm xdebug.ini
