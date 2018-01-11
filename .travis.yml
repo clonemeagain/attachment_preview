@@ -1,16 +1,18 @@
 language: php
-php:
-  - '5.3'
-  - '5.6'
-  - '7.1'
-
 matrix:
-  - fast_finish: true
-  
+  include:
+    - php: 5.3
+      dist: precise
+    - php: 5.4
+    - php: 5.6
+    - php: 7.1
+  fast_finish: true
+
 install:
   - wget https://github.com/osTicket/osTicket/archive/v1.10.1.tar.gz -O ot.tgz
   - tar xvf ot.tgz && mv osTicket-1.10.1 ../osticket
 
 before_script:
+  - phpenv config-rm xdebug.ini
   - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
   - echo 'date.timezone = "Europe/Paris"' >> ~/.phpenv/versions/$(phpenv version-name)/etc/conf.d/travis.ini
