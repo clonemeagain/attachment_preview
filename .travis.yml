@@ -1,6 +1,6 @@
 language: php
 env: 
-  - OSTICKET_VERSION=1.9
+  - OSTICKET_VERSION=1.9.16
   - OSTICKET_VERSION=1.10.1
   
 matrix:
