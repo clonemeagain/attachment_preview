@@ -54,11 +54,11 @@ final class AttachmentPreviewPluginTest extends TestCase {
         $script_element->nodeValue = 'FINDME';
 
         // Connect to the attachment_previews API wrapper and save the structure:
-        Signal::send('attachments.wrapper', 'test', (object) [
+        Signal::send('attachments.wrapper', 'test', (object) array(
                     'locator'    => 'tag', // References an HTML tag, in this case <body>
                     'expression' => 'body', // Append to the end of the body (persists through pjax loads of the container)
                     'element'    => $script_element
-                ]
+                )
         );
 
         $html = '<!DOCTYPE html><html><head><title>Title!</title></head><body><p>Body!</p></body></html>';
