@@ -7,12 +7,8 @@ matrix:
   - fast_finish: true
   
 install:
-  - if ! [ -f ../osticket/README.md ]; then wget https://github.com/osTicket/osTicket/archive/v1.10.1.tar.gz -O ot.tgz; fi
-  - if ! [ -f ../osticket/README.md ]; then tar xvf ot.tgz && mv osTicket-1.10.1 ../osticket; fi
-
-cache:
-  directories:
-  - ../osticket
+  - wget https://github.com/osTicket/osTicket/archive/v1.10.1.tar.gz -O ot.tgz
+  - tar xvf ot.tgz && mv osTicket-1.10.1 ../osticket
 
 before_script:
   - '! find . -type f -name "*.php" -exec php -d error_reporting=32767 -l {} \; 2>&1 >&- | grep "^"'
