@@ -10,7 +10,7 @@ CHECKOUT_FOLDER="$PARENT/osticket"
 
 # Validate that the environment variable is set by setting it to the repo tag
 TAG="v$OSTICKET_VERSION"
-if [[ $TAG = "v" ]]; then echo "osTicket version not set."; exit 1; fi
+if [ $TAG = "v" ]; then echo "osTicket version not set."; exit 1; fi
 
 # Validate that the tag exists in the repo
 if git ls-remote --tags $OSTICKET_REPO | grep -q "$TAG"
