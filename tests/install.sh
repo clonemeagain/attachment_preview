@@ -3,7 +3,10 @@ set -ev
 
 # This is the parent project's repository
 OSTICKET_REPO="https://github.com/osTicket/osTicket.git"
-CHECKOUT_FOLDER=$(realpath "$(pwd)/../")"/osticket"
+
+# Can't use /usr/bin/realpath on travis image for some reason
+PARENT=$(dirname $(pwd))
+CHECKOUT_FOLDER="$PARENT/osticket"
 
 # Validate that the environment variable is set by setting it to the repo tag
 TAG="v$OSTICKET_VERSION"
