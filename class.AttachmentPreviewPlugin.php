@@ -35,7 +35,7 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @var string
      */
-    const DEBUG = TRUE;
+    const DEBUG = FALSE;
 
     /**
      * An array of messages to be logged. This plugin is called before $ost is
@@ -112,34 +112,33 @@ class AttachmentPreviewPlugin extends Plugin {
      * @see Plugin::bootstrap()
      */
     function bootstrap() {
-        // Ensure plugin does not run during cli cron calls. There is no DOM to manipulate in CLI mode.
+// Ensure plugin does not run during cli cron calls. There is no DOM to manipulate in CLI mode.
         if (php_sapi_name() == 'cli') {
             return;
         }
 
-        // Assuming that other plugins want to inject an element or two..
-        // Provide a connection point to the attachments.wrapper
+// Assuming that other plugins want to inject an element or two..
+// Provide a connection point to the attachments.wrapper
         Signal::connect(self::signal_id, function ($object, $data) {
-            // This debug_log line only works in php5.4+             
-            // $this->debug_log("Received connection from %s", get_class($object));
-            // 
-            // Assumes you want to edit the DOM with your structures, and that you've read the docs.
-            // Just save them here until the page is done rendering, then we'll make all these changes at once:
+            $self::$instance->debug_log("Received connection from %s", get_class($object));
+// 
+// Assumes you want to edit the DOM with your structures, and that you've read the docs.
+// Just save them here until the page is done rendering, then we'll make all these changes at once:
             self::$foreign_elements[get_class($object)] = $data;
         });
 
-        // Check what our URI is, if acceptable, add to the output.. :-)
-        // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
-        // Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
+// Check what our URI is, if acceptable, add to the output.. :-)
+// Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
+// Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
         if (self::isTicketsView() && $this->getConfig()->get('attachment-enabled')) {
             $this->debug_log("Agent requested a tickets-view: Starting the attachments plugin.");
-            // We could hack at core, or we can simply capture the whole page output and modify the HTML then..
-            // Not "easier", but less likely to break core.. right?
-            // There appears to be a few uses of ob_start in the codebase, but they stack, so it works!
+// We could hack at core, or we can simply capture the whole page output and modify the HTML then..
+// Not "easier", but less likely to break core.. right?
+// There appears to be a few uses of ob_start in the codebase, but they stack, so it works!
             ob_start();
 
-            // This will run after everything else, empties the buffer and runs our code over the HTML
-            // Then we send it to the browser as though nothing changed..
+// This will run after everything else, empties the buffer and runs our code over the HTML
+// Then we send it to the browser as though nothing changed..
             register_shutdown_function(function() {
                 AttachmentPreviewPlugin::shutdownHandler();
             });
@@ -154,12 +153,12 @@ class AttachmentPreviewPlugin extends Plugin {
     public static function shutdownHandler() {
         $plugin = AttachmentPreviewPlugin::getInstance();
         $plugin->debug_log("Shutdown handler for inline attachments running");
-        // Output the buffer
-        // Check for Attachable's and print
-        // Note: This also checks foreign_elements
+// Output the buffer
+// Check for Attachable's and print
+// Note: This also checks foreign_elements
         print $plugin->inlineAttachments(ob_get_clean());
 
-        // See if there was any HTML to be appended.
+// See if there was any HTML to be appended.
         if ($plugin->appended) {
             $plugin->debug_log("Appender appending appendable HTML");
             print $plugin->appended;
@@ -202,66 +201,46 @@ class AttachmentPreviewPlugin extends Plugin {
     private function inlineAttachments($html) {
         if (!$html) {
             $this->debug_log("Received no HTML, returned none..");
-            // Something broke.. we can't even really recover from this, hopefully it wasn't our fault.
-            // If this was called incorrectly, actually sending HTML could break AJAX or a binary file or something..
-            // Error message therefore disabled:
+// Something broke.. we can't even really recover from this, hopefully it wasn't our fault.
+// If this was called incorrectly, actually sending HTML could break AJAX or a binary file or something..
+// Error message therefore disabled:
             return '<html><body><h3>:-(</h3><p>Not sure what happened.. something broke though.</p></body></html>';
         }
 
-        // We'll need this..
+// We'll need this..
         $config             = $this->getConfig();
         $allowed_extensions = $this->get_allowed_extensions($config);
 
         if (!count($allowed_extensions)) {
             $this->debug_log("Not allowed to do anything, not doing anything.");
-            // We've not been granted permission to change anything, so don't... just return original HTML.
+// We've not been granted permission to change anything, so don't... just return original HTML.
             return $html;
         }
 
         $this->debug_log("Looking for linked files with ext: " . implode(',', array_values($allowed_extensions)));
 
 
-        // Let's not get regex happy.. we all have the tendency.. :-)
+// Let's not get regex happy.. we all have the tendency.. :-)
         $dom   = self::getDom($html);
         $xpath = new DOMXPath($dom);
-        // $xpath->registerNamespace('html', 'http://www.w3.org/1999/xhtml');
 
         $links_seen          = 0;
         $attachments_inlined = 0;
 
-        $rewrite_youtube = (bool) $config->get('attach-youtube'); // cache responses
-        $rewrite_links   = (bool) $config->get('newtab-links');
-
-        // Find all <a> elements: http://stackoverflow.com/a/29272222 as DOMElement's
+// cache setting 
+        $rewrite_youtube = (bool) $config->get('attach-youtube');
+// Find all <a> elements: http://stackoverflow.com/a/29272222 as DOMElement's
         foreach ($dom->getElementsByTagName('a') as $link) {
-            // All links.. could be messy
+// All links.. could be messy
             $this->debug_log("Saw link: %s", $link->textContent);
             $links_seen ++;
 
-            // Check the link points to osTicket's "attachments" provider:
-            // osTicket uses /file.php for all attachments
-            // we could have used XPATH: //a[@class="file"] however, that would break the youtube one.
+// Check the link points to osTicket's "attachments" provider:
+// osTicket uses /file.php for all attachments
+// we could have used XPATH: //a[@class="file"] however, that would break the youtube one.
             if (strpos($link->getAttribute('href'), '/file.php') !== FALSE) {
-                if ($rewrite_links && !$link->getAttribute('target')) {
-                    $this->debug_log("CHANGING ATTRIBUTE OF ATTACHMENT LINK");
-                    // Set the target attribute of the attachment link to _blank to make the browser open in new-window/tab
-                    // Have to do it before we append to this element.
-                    // Rebuild the link with the attributes we want.. ffs DOM
-                    $new_link      = $dom->createElement('a', $link->nodeValue);
-                    $new_link->setAttribute('href', $link->getAttribute('href'));
-                    $new_link->setAttribute('class', $link->getAttribute('class'));
-                    $new_link->setAttribute('target', '_blank');
-                    // Simply using NodeElement::replaceChild on the $link's parent element didn't work.. 
-                    // So.. Let's get creative. 
-                    // We want to put it before the <em> element containing the size.. 
-                    $em_to_prepend = $link->nextSibling;
-                    $link->parentNode->insertBefore($new_link, $em_to_prepend);
-
-                    // If we delete it now, we can't use it to inject the attachment.., so, we delete later.
-                    // $link->parentNode->removeChild($link);
-                }
-                // Luckily, the attachment link contains the filename.. which we can use!
-                // Grab the extension of the file from the filename:
+// Luckily, the attachment link contains the filename.. which we can use!
+// Grab the extension of the file from the filename:
                 $ext        = $this->getExtension($link->textContent);
                 if ($size_limit = (int) $config->get('attachment-size') && $size_limit) {
                     $this->debug_log("size filter found: %b kb", $size_limit);
@@ -272,7 +251,7 @@ class AttachmentPreviewPlugin extends Plugin {
                         $this->debug_log("%s is roughly: %d bytes in size.", $ext, $size_b);
                         $size_kb = $size_b / 1024;
                         if ($size_kb > $size_limit) {
-                            // Skip this one, got a bit of an ass on it!
+// Skip this one, got a bit of an ass on it!
                             $this->debug_log("Skipping attachment, size filter restricted it.");
                             continue;
                         }
@@ -280,29 +259,33 @@ class AttachmentPreviewPlugin extends Plugin {
                 }
                 $this->debug_log("Attempting to add %s file.", $ext);
 
-                // See if admin allowed us to inject files with this extension:
+// See if admin allowed us to inject files with this extension:
                 if (!$ext || !isset($allowed_extensions[$ext])) {
                     continue;
                 }
 
-                // Find the associated method to add the attachment: (defined above, eg: csv => addTEXT)
+// Find the associated method to add the attachment: (defined above, eg: csv => addTEXT)
                 $func = $allowed_extensions[$ext];
                 if (method_exists($this, $func)) {
                     $this->debug_log("Calling %s for %s", $func, $link->getAttribute('href'));
-                    // Call the method to insert the linked attachment into the DOM:
-                    $this->{$func}($dom, $link);
+// Call the method to insert the linked attachment into the DOM:
+                    try {
+                        $this->{$func}($dom, $link);
+                    } catch (Exception $e) {
+                        $this->log("Exception encountered running $func");
+                    }
                     $attachments_inlined++;
-                }
-
-                if ($rewrite_links) {
-                    $link->parentNode->removeChild($link);
                 }
             }
             elseif ($rewrite_youtube) {
-                // This link isn't to /file.php & admin have asked us to check if it is a youtube link.
-                // The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
+// This link isn't to /file.php & admin have asked us to check if it is a youtube link.
+// The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
                 if (strpos($link->getAttribute('href'), 'youtub') !== FALSE) {
-                    $this->add_youtube($dom, $link);
+                    try {
+                        $this->add_youtube($dom, $link);
+                    } catch (Exception $e) {
+                        $this->log("Exception encountered injecting Youtube player");
+                    }
                     $attachments_inlined++;
                 }
             }
@@ -311,19 +294,19 @@ class AttachmentPreviewPlugin extends Plugin {
         $this->debug_log("Saw %d link elements in the osTicket page.", $links_seen);
         $this->debug_log("Inlined: %d attachment[s].", $attachments_inlined);
 
-        // Before we return this, let's see if any foreign_elements have been provided by other plugins, we'll insert them.
-        // This allows those plugins to edit this plugin.. seat-of-the-pants stuff!
+// Before we return this, let's see if any foreign_elements have been provided by other plugins, we'll insert them.
+// This allows those plugins to edit this plugin.. seat-of-the-pants stuff!
         if (count(self::$foreign_elements)) {
             $this->processRemoteElements($dom); // Handles the HTML generation at the end.
         }
 
-        // just return the original if error
+// just return the original if error
         $modified_html = self::printDom($dom);
         if (!$modified_html) {
             $this->log("Error manipulating the DOM, original returned.");
             return $html;
         }
-        // The edited HTML can be sent to the browser (end of shutdown_handler calls print)
+// The edited HTML can be sent to the browser (end of shutdown_handler calls print)
         return $modified_html;
     }
 
@@ -334,10 +317,10 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param PluginConfig $config
      */
     private function get_allowed_extensions(PluginConfig $config) {
-        // Determine what method to run for each extension type:
+// Determine what method to run for each extension type:
         $allowed_extensions = array();
 
-        // If you know browsers can handle more, please, submit a pull request!
+// If you know browsers can handle more, please, submit a pull request!
         $types = array(
             'pdf'   => array(
                 'pdf'
@@ -376,7 +359,7 @@ class AttachmentPreviewPlugin extends Plugin {
                 continue;
             }
             foreach ($extensions as $ext) {
-                // Example: [pdf] = add_pdf
+// Example: [pdf] = add_pdf
                 $allowed_extensions[$ext] = 'add_' . $type;
             }
         }
@@ -392,8 +375,8 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     private function add_audio(DOMDocument $doc, DOMElement $link) {
         $audio = $doc->createElement('audio');
-        // $audio->setAttribute('autoplay','false'); //TODO: See if anyone wants these as admin options
-        // $audio->setAttribute('loop','false');
+// $audio->setAttribute('autoplay','false'); //TODO: See if anyone wants these as admin options
+// $audio->setAttribute('loop','false');
         $audio->setAttribute('preload', 'auto');
         $audio->setAttribute('controls', 1);
         $audio->setAttribute('src', $link->getAttribute('href'));
@@ -409,13 +392,14 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param DOMElement $link
      */
     private function add_html(DOMDocument $doc, DOMElement $link) {
-        static $trim_func;
-        if (!$trim_func) {
-            $trim_func    = TRUE;
-            $t            = $doc->createElement('script');
-            $t->setAttribute('name', 'HTML Sanitizer');
-            $t->nodeValue = file_get_contents(__DIR__ . '/sanitizer.js');
-            $doc->appendChild($t);
+        static $trim_func = TRUE; // ensure we only insert this once, and only if we need it. 
+        if ($trim_func) {
+            $trim_func       = FALSE;
+            $sanitizer       = $doc->createElement('script');
+            $sanitizer->setAttribute('name', 'Plugin: attachment_preview HTML Sanitizer Script');
+            $sanitizer_cdata = $doc->createCDATASection(file_get_contents(__DIR__ . '/sanitizer.js'));
+            $sanitizer->appendChild($sanitizer_cdata);
+            $doc->appendChild($sanitizer);
         }
 
         $d = $doc->createElement('div');
@@ -435,18 +419,18 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     private function add_image(DOMDocument $doc, DOMElement $link) {
 
-        // Rebuild the download link as a normal clickable link, for full-size viewing:
+// Rebuild the download link as a normal clickable link, for full-size viewing:
         $a = $doc->createElement('a');
         $a->setAttribute('href', $link->getAttribute('href'));
 
-        // Build an image of the referenced file, so we can simply preview it
+// Build an image of the referenced file, so we can simply preview it
         $img = $doc->createElement('img');
         $img->setAttribute('data-url', $link->getAttribute('href'));
         $img->setAttribute('data-type', 'image');
-        // Put the image inside the link, so the image is clickable (opens in new tab):
+// Put the image inside the link, so the image is clickable (opens in new tab):
         $a->appendChild($img);
 
-        // Add a title attribute to the download link:
+// Add a title attribute to the download link:
         $link->setAttribute('title', 'Download this image.');
         $this->debug_log('Wrapped %s as image.', $link->textContent);
         $this->wrap($doc, $link, $a);
@@ -459,7 +443,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param DOMElement $link
      */
     private function add_pdf(DOMDocument $doc, DOMElement $link) {
-        // Build a Chrome/Firefox compatible <object> to hold the PDF
+// Build a Chrome/Firefox compatible <object> to hold the PDF
         $pdf = $doc->createElement('object');
         $pdf->setAttribute('width', '100%');
         $pdf->setAttribute('height', '1000px'); // Arbitrary height
@@ -468,7 +452,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $pdf->setAttribute('data-type', 'pdf');
         $pdf->setAttribute('data-url', $link->getAttribute('href'));
 
-        // Add a <b>Nope</b> type message for obsolete or text-based browsers.
+// Add a <b>Nope</b> type message for obsolete or text-based browsers.
         $message            = $doc->createElement('b');
         $message->nodeValue = 'Your "browser" is unable to display this PDF. ';
         if ($this->getConfig()->get('show-ms-upgrade-help')) {
@@ -508,9 +492,9 @@ class AttachmentPreviewPlugin extends Plugin {
     private function add_youtube(DOMDocument $doc, DOMElement $link) {
         $youtube_id = $this->getYoutubeIdFromUrl($link->getAttribute('href'));
         if ($youtube_id !== FALSE) {
-            // Now we can add an iframe so the video is instantly playable.
-            // eg: <iframe width="560" height="349" src="http://www.youtube.com/embed/something?rel=0&hd=1" frameborder="0" allowfullscreen></iframe>
-            // TODO: Make responsive.. if required.
+// Now we can add an iframe so the video is instantly playable.
+// eg: <iframe width="560" height="349" src="http://www.youtube.com/embed/something?rel=0&hd=1" frameborder="0" allowfullscreen></iframe>
+// TODO: Make responsive.. if required.
             $player = $doc->createElement('iframe');
             $player->setAttribute('width', '560');
             $player->setAttribute('height', '349');
@@ -550,77 +534,89 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param DOMElement $new_child
      */
     private function wrap(DOMDocument $doc, DOMElement $source, DOMElement $new_child) {
-        // Implement a limit for attachments. Only show the admin configured amount at first
-        // if there are any more, we will inject them, however they will be shown as buttons
+// Implement a limit for attachments. Only show the admin configured amount at first
+// if there are any more, we will inject them, however they will be shown as buttons
         static $number = 0;
         static $limit  = 0;
 
         if (!$number) {
-            $number         = 1;
-            // Fetch the attachment limit from the config for later
-            $limit          = $this->getConfig()->get('show-initially');
-            // First attachment, add our stylesheet
-            $css            = $doc->createElement('style');
-            $css->setAttribute('name', 'Attachments Preview Stylesheet');
-            $css->nodeValue = file_get_contents(__DIR__ . '/stylesheet.css', FALSE);
+            $number = 1;
+// Fetch the attachment limit from the config for later
+            $limit  = $this->getConfig()->get('show-initially');
+
+// First attachment added, insert our stylesheet:
+            $css       = $doc->createElement('style');
+            $css->setAttribute('name', 'Plugin: attachment_preview Stylesheet');
+            $css_cdata = $doc->createCDATASection(file_get_contents(__DIR__ . '/stylesheet.css'));
+            $css->appendChild($css_cdata);
             $source->parentNode->appendChild($css);
 
-            // This script enables toggling the display of the too many attachments
+// This script enables toggling the display of attachments depending on config:
             $toggle_script = $doc->createElement('script');
             $toggle_script->setAttribute('type', 'text/javascript');
-            $toggle_script->setAttribute('name', 'Attachments Preview Toggle Script');
+            $toggle_script->setAttribute('name', 'Plugin: attachment_preview Script');
 
-            // This makes it translateable.
-            $replace                  = array(
-                '#SHOW#'  => __('Show Attachment'),
-                '#HIDE#'  => __('Hide Attachment'),
-                '#LIMIT#' => $limit
-            );
-            $toggle_script->nodeValue = str_replace(array_keys($replace), array_values($replace), file_get_contents(__DIR__ . '/script.js'));
+// Build a config object of options for javascript to use
+// This makes it translateable/dynamic/configurable etc.
+            $plugin_options = (object) array(
+                        'text_show'        => __('Show Attachment'),
+                        'text_hide'        => __('Hide Attachment'),
+                        'limit'            => $limit,
+                        'open_attachments' => $this->getConfig()->get('newtab-links') ? 'new-tab' : 'normal');
 
-            // Insert the script into the first wrapped element
+            $plugin_js_variable = 'pluginConfig = ' . json_encode($plugin_options) . ';'; //NOTE: JSON_PRETTY_PRINT only available from 5.4+
+// If we were able to simply link to the script, we could insert the settings and have the browser cache the script.. but noo
+// Fetch the file and replace the comment with the config to override the defaults:
+            $script_source      = str_replace('/* REPLACED_BY_PLUGIN */', $plugin_js_variable, file_get_contents(__DIR__ . '/script.js'));
+
+// Hack to work around https://bugs.php.net/bug.php?id=31613
+// from: http://php.net/manual/en/domdocument.createcdatasection.php
+            $script_cdata = $doc->createCDATASection("\n" . $script_source . "\n");
+            $toggle_script->appendChild($script_cdata);
+
+// Insert the script into the first wrapped element
             $source->parentNode->appendChild($toggle_script);
         }
         else {
             $number++;
         }
 
-        // Build a wrapper element to contain the attachment
+// Build a wrapper element to contain the attachment
         $wrapper = $doc->createElement('div');
 
-        // Build an ID for the wrapper
+// Build an ID for the wrapper
         $id = 'ap-file-' . $number;
         $wrapper->setAttribute('id', $id);
 
-        // Set the child's ID.. for ease of scripting
+// Set the child's ID.. for ease of scripting
         $new_child->setAttribute('id', "$id-c");
 
-        // Add the element to the wrapper
+// Add the element to the wrapper
         $wrapper->appendChild($new_child);
 
-        // See if we are over the admin-defined maximum number of inline-attachments:
+// See if we are over the admin-defined maximum number of inline-attachments:
         if ($limit == "ALL" || $number <= $limit) {
-            // Not limited, just add a class to received our styles
+// Not limited, just add a class to received our styles
             $wrapper->setAttribute('class', 'ap_embedded');
         }
         else {
-            // Instead of injecting the element, let's show a button to click
+// Instead of injecting the element, let's show a button to click
             $button = $doc->createElement('a');
             $button->setAttribute('class', 'button');
 
-            // Link button to the toggle function
-            $button->setAttribute('onClick', "javascript:ap_toggle(this,'$id');");
+// Link button to the toggle function
+            $button->setAttribute('onClick', "ap_toggle(this,'$id');");
 
-            // Initially set the text, toggle will change it to "Hide" if toggled
+// Initially set the text, toggle will change it to "Hide" if toggled
             $button->nodeValue = __('Show Attachment');
 
-            // Hide the whole wrapper via the class "hidden"
+// Hide the whole wrapper via the class "hidden"
             $wrapper->setAttribute('class', 'ap_embedded hidden');
 
-            // Insert the button before the wrapper, so it stays where it is when the wrapper expands.
+// Insert the button before the wrapper, so it stays where it is when the wrapper expands.
             $source->parentNode->appendChild($button);
         }
-        // Add the wrapper to the thread/source element
+// Add the wrapper to the thread/source element
         $source->parentNode->appendChild($wrapper);
     }
 
@@ -631,9 +627,9 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return mixed Youtube video ID or FALSE if not found
      */
     public function getYoutubeIdFromUrl($url) {
-        // Series of possible url patterns, please pull-request any others you find!
-        // Ideally they are in "most-common" first order.
-        // Note the match group's around the ID of the video
+// Series of possible url patterns, please pull-request any others you find!
+// Ideally they are in "most-common" first order.
+// Note the match group's around the ID of the video
         $regex = array(
             '/youtube\.com\/watch\?v=([^\&\?\/]+)/',
             '/youtube\.com\/embed\/([^\&\?\/]+)/',
@@ -645,11 +641,11 @@ class AttachmentPreviewPlugin extends Plugin {
         foreach ($regex as $pattern) {
             if (preg_match($pattern, $url, $match)) {
                 $this->debug_log('Matched youtube id: %s for url: %s', $match[1], $url);
-                // Return the matched video ID
+// Return the matched video ID
                 return $match[1];
             }
         }
-        // not a youtube video
+// not a youtube video
         return FALSE;
     }
 
@@ -661,45 +657,33 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public static function getDom($html = '') {
         $p                        = self::getInstance();
-        $p->debug_log("Loading HTML into DOM object.");
         $dom                      = new \DOMDocument('1.0', 'UTF-8');
         $dom->validateOnParse     = true;
         $dom->resolveExternals    = true;
         $dom->preserveWhiteSpace  = false;
-        // Turn off XML errors.. if only it was that easy right?
+// Turn off XML errors.. if only it was that easy right?
         $dom->strictErrorChecking = FALSE;
-        libxml_use_internal_errors(true);
+        $xml_error_setting        = libxml_use_internal_errors(true);
 
-        // Because PJax isn't a full document, it kinda breaks DOMDocument
-        // Which expects a full document! (You know with a DOCTYPE, <HTML> <BODY> etc.. )
+// Because PJax isn't a full document, it kinda breaks DOMDocument
+// Which expects a full document! (You know with a DOCTYPE, <HTML> <BODY> etc.. )
         if (self::isPjax() &&
                 (strpos($html, '<!DOCTYPE') !== 0 || strpos($html, '<html') !== 0)) {
-            // Prefix the non-doctyped html snippet with an xml prefix
-            // This tricks DOMDocument into loading the HTML snippet
+// Prefix the non-doctyped html snippet with an xml prefix
+// This tricks DOMDocument into loading the HTML snippet
             $xml_prefix = '<?xml encoding="UTF-8" />';
             $html       = $xml_prefix . $html;
         }
 
-        // Convert the HTML into a DOMDocument, however, don't imply it's HTML, and don't insert a default Document Type Template
-        // Note, we can't use the Options parameter until PHP 5.4 http://php.net/manual/en/domdocument.loadhtml.php
-        $loaded = false;
-        if (version_compare(PHP_VERSION, '5.4', '>=')) {
-            $loaded = $dom->loadHTML($html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        }
-        else {
-            $loaded = $dom->loadHTML($html);
-        }
-        if (!$loaded) {
-            if (DEBUG) {
-                $error = libxml_get_errors();
-                print_r($error);
-            }
+// Convert the HTML into a DOMDocument, however, don't imply it's HTML, and don't insert a default Document Type Template
+// Note, we can't use the Options parameter until PHP 5.4 http://php.net/manual/en/domdocument.loadhtml.php
+        if (!($loaded = $dom->loadHTML($html))) {
             $p->debug_log("There was a problem loading the DOM.");
         }
         else {
             $p->debug_log("%d chars of HTML was inserted into a DOM", strlen($html));
         }
-        libxml_use_internal_errors(FALSE); // restore xml parser error handlers
+        libxml_use_internal_errors($xml_error_setting); // restore xml parser error handlers
         $p->debug_log('DOM Loaded.');
         return $dom;
     }
@@ -708,16 +692,16 @@ class AttachmentPreviewPlugin extends Plugin {
      * Gets the DOM back as HTML
      *
      * @param DOMDocument $dom
-     * @return mixed|string
+     * @return bool|string
      */
     public static function printDom(DOMDocument $dom) {
         $p        = self::getInstance();
         $p->debug_log("Converting the DOM back to HTML");
-        // Check for failure to generate HTML
-        // DOMDocument::saveHTML() returns null on error
+// Check for failure to generate HTML
+// DOMDocument::saveHTML() returns null on error
         $new_html = $dom->saveHTML();
 
-        // Remove the DOMDocument make-happy encoding prefix:
+// Remove the DOMDocument make-happy encoding prefix:
         if (self::isPjax()) {
             $remove_prefix_pattern = '@<\?xml encoding="UTF-8" />@';
             $new_html              = preg_replace($remove_prefix_pattern, '', $new_html);
@@ -743,7 +727,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @param $_ any number of params for the macros
      */
     private function log($text, $_ = null) {
-        // Log to system, if available
+// Log to system, if available
         global $ost;
 
         $args   = func_get_args();
@@ -752,23 +736,23 @@ class AttachmentPreviewPlugin extends Plugin {
             return;
         }
         if (is_array($args[0])) {
-            // handle debug_log's version or array of variables passed
+// handle debug_log's version or array of variables passed
             $text = vsprintf($format, $args[0]);
         }
         elseif (count($args)) {
-            // handle normal variables as arguments
+// handle normal variables as arguments
             $text = vsprintf($format, $args);
         }
         else {
-            // no variables passed
+// no variables passed
             $text = $format;
         }
 
         if (!$ost instanceof osTicket) {
-            // doh, can't log to the admin log without this object
-            // setup a callback to do the logging afterwards:
-            // save the log message in memory for now
-            // the callback registered above will retrieve it and log it
+// doh, can't log to the admin log without this object
+// setup a callback to do the logging afterwards:
+// save the log message in memory for now
+// the callback registered above will retrieve it and log it
             $this->messages[] = $text;
             return;
         }
@@ -825,24 +809,24 @@ class AttachmentPreviewPlugin extends Plugin {
      */
     public static function add_arbitrary_html($html = '', $locator = 'id', $expression = 'pjax-container') {
 
-        // Define a static index, we increment it for every node we add
+// Define a static index, we increment it for every node we add
         static $foreigners = 1;
 
         if (self::DEBUG) {
-            // note: static function can't call $this->debug_log()
+// note: static function can't call $this->debug_log()
             if (self::DEBUG) {
                 $p = self::getInstance();
                 $p->debug_log("Received %d chars of arbitrary HTML", strlen($html));
             }
         }
 
-        // Wrap in a <div> then check for children of it immediately after:
-        // DOMElement needs something like a div to wrap it.. otherwise it loads scripts as a DOMCdataElement or something
+// Wrap in a <div> then check for children of it immediately after:
+// DOMElement needs something like a div to wrap it.. otherwise it loads scripts as a DOMCdataElement or something
         $dom        = self::getDom("<html><div>$html</div></html>");
-        // Now everything that they added can be injected as a "Foreign Element"
-        // Note the selector selects the first <div> which is what we injected two lines up:
+// Now everything that they added can be injected as a "Foreign Element"
+// Note the selector selects the first <div> which is what we injected two lines up:
         $structures = array();
-        foreach ($dom->getElementsByTagName('div')->item(0)->childNodes as $node) { //Might fail on 5.3
+        foreach ($dom->getElementsByTagName('div')->item(0)->childNodes as $node) {
             $structures[] = (object) array(
                         'element'    => $node,
                         'locator'    => $locator,
@@ -872,7 +856,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $script_element->setAttribute('type', 'text/javascript');
         $script_element->nodeValue = $script;
 
-        // Connect to the attachment_previews API wrapper and save the structure:
+// Connect to the attachment_previews API wrapper and save the structure:
         self::$foreign_elements['raw-script-' . $script_count++] = array(
             (object) array(
                 'locator'    => 'tag', // References an HTML tag, in this case <body>
@@ -893,7 +877,7 @@ class AttachmentPreviewPlugin extends Plugin {
             $p = self::getInstance();
             $p->debug_log("Received %d chars of HTML to append", strlen($html));
         }
-        //$plugin           = self::getInstance();
+//$plugin           = self::getInstance();
         self::$appended .= $html;
     }
 
@@ -907,7 +891,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return DOMDocument
      */
     private function processRemoteElements(DOMDocument &$dom) {
-        //@formatter:off
+//@formatter:off
         /*
          * $this->foreign_elements should be an array of structures like:
          * [
@@ -926,15 +910,15 @@ class AttachmentPreviewPlugin extends Plugin {
          *  ]
          * ]
          */
-        //@formatter:on
+//@formatter:on
         if (!count(self::$foreign_elements)) {
-            // We've already done them.
+// We've already done them.
             return $dom;
         }
         foreach (self::$foreign_elements as $source => $structures) {
             $this->debug_log("Loading %d remote structures from %s", count($structures), $source);
             foreach ($structures as $structure) {
-                // Validate the Structure
+// Validate the Structure
                 if (!is_object($structure)) {
                     $this->debug_log("Structure wasn't an object. Skipped.");
                     continue; // just skip
@@ -943,12 +927,12 @@ class AttachmentPreviewPlugin extends Plugin {
                     if (!property_exists($structure, 'setAttribute') && (!property_exists(
                                     $structure, 'element') || !is_object($structure->element) ||
                             !$structure->element instanceof DOMElement)) {
-                        // What?
+// What?
                         throw new \Exception(
                         "Invalid or missing parameter 'element' from source {$source}.");
                     }
 
-                    // Verify that the sender used a tag/id/xpath
+// Verify that the sender used a tag/id/xpath
                     if (!property_exists($structure, 'locator')) {
                         throw new \Exception("Invalid or missing locator");
                     }
@@ -960,16 +944,16 @@ class AttachmentPreviewPlugin extends Plugin {
                         throw new \Exception("Invalid or missing expression");
                     }
 
-                    // Load the element(s) into our DOM, we can't insert them until then.
+// Load the element(s) into our DOM, we can't insert them until then.
                     if (!property_exists($structure, 'setAttribute')) {
-                        // we aren't just changing an attribute, we are inserting new or replacing.
+// we aren't just changing an attribute, we are inserting new or replacing.
                         $imported_element = $dom->importNode($structure->element, true);
                     }
 
-                    // Based on type of DOM Selector, lets insert this imported element.
+// Based on type of DOM Selector, lets insert this imported element.
                     switch ($structure->locator) {
                         case 'xpath':
-                            // TODO: Fix this.. doesn't seem to work
+// TODO: Fix this.. doesn't seem to work
                             $finder = new \DOMXPath($dom);
                             $test   = 0;
                             foreach ($finder->query($structure->expression) as $node) {
@@ -981,14 +965,14 @@ class AttachmentPreviewPlugin extends Plugin {
                             }
                             break;
                         case 'id':
-                            // Note, ID doesn't mean jQuery $('#id'); usefulness.. its xml:id="something", which none of our docs will have.
+// Note, ID doesn't mean jQuery $('#id'); usefulness.. its xml:id="something", which none of our docs will have.
                             $finder   = new \DOMXPath($dom);
-                            // Add a fake namespace for the XPath class.. which needs one:
-                            //  $finder->registerNamespace('pluginprefix',
-                            //   $_SERVER['SERVER_NAME'] . '/pluginnamespace');
-                            // Find the first DOMElement with the id attribute matching the expression, there should only be one
+// Add a fake namespace for the XPath class.. which needs one:
+//  $finder->registerNamespace('pluginprefix',
+//   $_SERVER['SERVER_NAME'] . '/pluginnamespace');
+// Find the first DOMElement with the id attribute matching the expression, there should only be one
                             $nodeList = $finder->query("//*[@id='{$structure->expression}']");
-                            // Check length of the DOMNodeList
+// Check length of the DOMNodeList
                             if ($nodeList->length) {
                                 $node = $nodeList->item(0);
                                 $this->debug_log("Found a match for $expression!");
@@ -1015,7 +999,7 @@ class AttachmentPreviewPlugin extends Plugin {
                 $this->debug_log('Successfull.');
             }
         }
-        // Clear the array
+// Clear the array
         self::$foreign_elements = array();
     }
 
@@ -1048,7 +1032,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @return string
      */
     public static function getExtension($string) {
-        // Why reinvent the wheel? 
+// Why reinvent the wheel? 
         return trim(strtolower(pathinfo($string, PATHINFO_EXTENSION)));
     }
 
@@ -1065,30 +1049,30 @@ class AttachmentPreviewPlugin extends Plugin {
         $tickets_view = false;
         $url          = $_SERVER['REQUEST_URI'];
 
-        // Run through the most likely candidates first:
-        // Ignore POST data, unless we're seeing a new ticket, then don't ignore.
+// Run through the most likely candidates first:
+// Ignore POST data, unless we're seeing a new ticket, then don't ignore.
         if (isset($_POST['a']) && $_POST['a'] == 'open') {
             $tickets_view = TRUE;
         }
         elseif (strpos($url, '/scp/') === FALSE) {
-            // URL doesn't include /scp/ so isn't an agent page
+// URL doesn't include /scp/ so isn't an agent page
             $tickets_view = FALSE;
         }
         elseif (isset($_POST) && count($_POST)) {
-            // If something has been POST'd to osTicket, assume we're not Viewing a ticket
+// If something has been POST'd to osTicket, assume we're not Viewing a ticket
             $tickets_view = FALSE;
         }
         elseif (strpos($url, 'a=edit') || strpos($url, 'a=print')) {
-            // URL contains a=edit or a=print, so assume we aren't needed here!
+// URL contains a=edit or a=print, so assume we aren't needed here!
             $tickets_view = FALSE;
         }
         elseif (strpos($url, 'index.php') !== FALSE ||
                 strpos($url, 'tickets.php') !== FALSE) {
-            // Might be a ticket page..
+// Might be a ticket page..
             $tickets_view = TRUE;
         }
         else {
-            // Default
+// Default
             $tickets_view = FALSE;
         }
 
