@@ -8,5 +8,5 @@
     <directory suffix=".php">./</directory>
     <file></file>
   </whitelist>
-</filter>F
+</filter>
 </phpunit>
