@@ -38,10 +38,10 @@ final class AttachmentPreviewPluginTest extends TestCase {
     }
 
     public function getYoutubeUrls() {
-        return [
-            ['https://www.youtube.com/watch?v=53nCql7VEXA', '53nCql7VEXA'],
-            ['m.youtube.com/watch?v=53nCql7VEXA&app=desktop', '53nCql7VEXA']
-        ];
+        return array(array(
+                'https://www.youtube.com/watch?v=53nCql7VEXA', '53nCql7VEXA'),
+            array('m.youtube.com/watch?v=53nCql7VEXA&app=desktop', '53nCql7VEXA')
+        );
     }
 
     //public function testGetDom()// who named this shit?
@@ -54,11 +54,11 @@ final class AttachmentPreviewPluginTest extends TestCase {
         $script_element->nodeValue = 'FINDME';
 
         // Connect to the attachment_previews API wrapper and save the structure:
-        Signal::send('attachments.wrapper', 'test', (object) [
+        Signal::send('attachments.wrapper', 'test', (object) array(
                     'locator'    => 'tag', // References an HTML tag, in this case <body>
                     'expression' => 'body', // Append to the end of the body (persists through pjax loads of the container)
                     'element'    => $script_element
-                ]
+                )
         );
 
         $html = '<!DOCTYPE html><html><head><title>Title!</title></head><body><p>Body!</p></body></html>';
@@ -71,7 +71,7 @@ final class AttachmentPreviewPluginTest extends TestCase {
 
         $this->assertArrayHasKey('raw-script-1', AttachmentPreviewPlugin::$foreign_elements);
         $obj = reset(AttachmentPreviewPlugin::$foreign_elements['raw-script-1']);
-        $this->assertInstanceOf(DOMElement::class, $obj->element);
+        $this->assertInstanceOf('DOMElement', $obj->element);
     }
 
     // public function testAppendHtml(){} // pointless
@@ -89,12 +89,12 @@ final class AttachmentPreviewPluginTest extends TestCase {
     }
 
     public function getExtensionData() {
-        return [
-            ['test.php', 'php'],
-            ['something.jpg', 'jpg'],
-            ['ANtyHingsdf.asdfadf.234m,345,gdfd.F', 'f'],
-            ['swear.words', 'words']
-        ];
+        return array(
+            array('test.php', 'php'),
+            array('something.jpg', 'jpg'),
+            array('ANtyHingsdf.asdfadf.234m,345,gdfd.F', 'f'),
+            array('swear.words', 'words')
+        );
     }
 
     /**
@@ -121,25 +121,25 @@ final class AttachmentPreviewPluginTest extends TestCase {
     public function getUrls() {
         $b = 'https://tickets.dev/support/';
 
-        return [
-            [$b . 'index.php', FALSE],
-            [$b . 'tickets.php', FALSE],
-            [$b . 'scp/index.php', TRUE],
-            [$b . 'scp/tickets.php', TRUE],
-            [$b . 'scp/tickets.php?a=edit', FALSE],
-            [$b . 'scp/tickets.php?a=print', FALSE],
-            ['http://crazylongdomainnamethatreallyprobablyhopefullyisntinusebutactuallyyouknowwhatitjustmightbe.longasstld/someidiotpainfullylong/series/of/folders/threatening/to/make/the/url/longer/than/the/maximum/well/lets/be/honest/its/already/longer/than/anyone/would/want/to/type/support/scp/tickets.php?id=158279',
-                TRUE]
-        ];
+        return array(
+            array($b . 'index.php', FALSE),
+            array($b . 'tickets.php', FALSE),
+            array($b . 'scp/index.php', TRUE),
+            array($b . 'scp/tickets.php', TRUE),
+            array($b . 'scp/tickets.php?a=edit', FALSE),
+            array($b . 'scp/tickets.php?a=print', FALSE),
+            array('http://crazylongdomainnamethatreallyprobablyhopefullyisntinusebutactuallyyouknowwhatitjustmightbe.longasstld/someidiotpainfullylong/series/of/folders/threatening/to/make/the/url/longer/than/the/maximum/well/lets/be/honest/its/already/longer/than/anyone/would/want/to/type/support/scp/tickets.php?id=158279',
+                TRUE)
+        );
     }
 
     public function postUrls() {
         $b = 'https://tickets.dev/support/';
 
-        return [
-            [$b . 'scp/tickets.php', ['a' => 'open'], TRUE],
-            [$b . 'scp/anything.php', ['a' => 'anything'], FALSE],
-        ];
+        return array(
+            array($b . 'scp/tickets.php', array('a' => 'open'), TRUE),
+            array($b . 'scp/anything.php', array('a' => 'anything'), FALSE),
+        );
     }
 
     /**
@@ -173,15 +173,15 @@ final class AttachmentPreviewPluginTest extends TestCase {
      */
     public function getByteSizedStrings() {
 
-        return [
+        return array(
             // osticket string representation of size, number of bytes
-            ['1 bytes', 1],
-            ['444 bytes', 444],
-            ['1 kb', 1024],
-            ['122 kb', 124928],
-            ['1 mb', 1048576],
-            ['12 mb', 12582912]
-        ];
+            array('1 bytes', 1),
+            array('444 bytes', 444),
+            array('1 kb', 1024),
+            array('122 kb', 124928),
+            array('1 mb', 1048576),
+            array('12 mb', 12582912)
+        );
     }
 
     /**

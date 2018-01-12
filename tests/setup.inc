@@ -15,17 +15,18 @@ function db_input() {
 }
 
 function db_query() {
-    return array('ht' => []);
+    return array('ht' => array());
 }
 
 function db_fetch_array() { // obviously, tweak if you compile phars:
-    return ['ht' => [], 'install_path' => __DIR__, 'isphar' => FALSE];
+    return array('ht' => array(), 'install_path' => __DIR__, 'isphar' => FALSE);
 }
 
 assert(isset($plugin['plugin']) == TRUE);
 
-$file  = explode(':', $plugin['plugin'])[0];
-$class = explode(':', $plugin['plugin'])[1];
+$plugin_file  = explode(':', $plugin['plugin']); 
+$file = $plugin_file[0];
+$class = $plugin_file[1];
 
 assert(file_exists($file));
 include_once($file);
