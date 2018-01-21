@@ -1,5 +1,5 @@
 # Attachment Preview
-An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of Attachments
+An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of Attachments, works with PHP5.3+ and osTicket 1.9+
 
 [![Build Status](https://travis-ci.org/clonemeagain/attachment_preview.svg?branch=master)](https://travis-ci.org/clonemeagain/attachment_preview)
 
@@ -34,15 +34,17 @@ The plugin will still be available, you have deleted the config only at this poi
 # How it works:
 Latest in [Wiki](https://github.com/clonemeagain/attachment_preview/wiki)
 
-* Essentially it's simple, when enabled, and a ticket page is viewed, an output buffer is created on osTicket BootStrap which waits for the page to be finished rendering by osTicket. (Using php's register_shutdown_function & ob_start)
-* When that's done, we fetch the output buffer and convert the HTML structure into a DOMDocument, pretty standard PHP so far.
-* The plugin then runs through the link elements of the Document, to find all Attachments.
-* It then adds a new DOMElement after the attachments section, inlining each attachment. PDF's become `<object>`'s, PNG's become `<img>` etc. 
-Tested and works on 1.8-git. SHOULD work on future versions, depending on how the files are attached.. haven't tested on anything else though, let me know! 
+* Essentially it's simple, when enabled, and a ticket page is viewed, an output buffer is created which waits for the page to be finished rendering by osTicket. (Using php's register_shutdown_function & ob_start)
+* The plugin then uses a DOMDocument and adds a new DOMElement after each attachment, inlining them. PDF's become `<object>`'s, PNG's become `<img>` etc. 
 
-The plugin is self-contained, so ZERO MODS to core are required. You simply clone the repo or download the zip from github and extract into /includes/plugins/ which should make a folder: "attachment_preview", but it could be called anything. 
+The plugin has several administratively configurable options, including, but not limited to:
+* What to inline (PDF/Image/Youtube/Text/HTML etc)
+* The maximum size of attachments to inline.
+* How many to inline, attachments after that are still inlineable, but the Agent has to press a "Show Attachment" button (translateable). 
+* We now support changing the original attachment link into a "New Tab", so there is an option for that.
 
+The plugin is completely self-contained, so ZERO MODS to core are required. You simply clone the repo or download the zip from github and extract into /includes/plugins/ which should make a folder: "attachment_preview", but it could be called anything. 
 
 # TODO:
-- ??
-- You tell me!
+- Have an idea for us to work with? [Let us know via the Issue Queue above!](https://github.com/clonemeagain/attachment_preview/issues/new)
+
