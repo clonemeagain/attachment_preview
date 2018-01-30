@@ -120,18 +120,20 @@ class AttachmentPreviewPlugin extends Plugin {
 // Assuming that other plugins want to inject an element or two..
 // Provide a connection point to the attachments.wrapper
         Signal::connect(self::signal_id, function ($object, $data) {
-            $self::$instance->debug_log("Received connection from %s", get_class($object));
+            if (version_compare(PHP_VERSION, '5.4.0') >= 0)
+                $self::$instance->debug_log("Received connection from %s", get_class($object));
 // 
 // Assumes you want to edit the DOM with your structures, and that you've read the docs.
 // Just save them here until the page is done rendering, then we'll make all these changes at once:
-            self::$foreign_elements[get_class($object)] = $data;
+            AttachmentPreviewPlugin::$foreign_elements[get_class($object)] = $data;
         });
 
 // Check what our URI is, if acceptable, add to the output.. :-)
 // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
 // Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
         if (self::isTicketsView() && $this->getConfig()->get('attachment-enabled')) {
-            $this->debug_log("Agent requested a tickets-view: Starting the attachments plugin.");
+            if (version_compare(PHP_VERSION, '5.4.0') >= 0)
+                $this->debug_log("Agent requested a tickets-view: Starting the attachments plugin.");
 // We could hack at core, or we can simply capture the whole page output and modify the HTML then..
 // Not "easier", but less likely to break core.. right?
 // There appears to be a few uses of ob_start in the codebase, but they stack, so it works!
