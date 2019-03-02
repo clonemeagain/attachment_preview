@@ -15,7 +15,8 @@ final class AttachmentPreviewPluginTest extends TestCase {
 
     private $plugin;
 
-    protected function setUp() {
+    // This will probably break in earlier versions of php.. christ.
+    protected function  setUp(): void {
         // reset the mock
         $this->plugin = new AttachmentPreviewPlugin(1);
     }
