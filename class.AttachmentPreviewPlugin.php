@@ -966,7 +966,7 @@ class AttachmentPreviewPlugin extends Plugin {
               else {
                 $this->log("Unable to find node with expression %s",
                   $structure->expression);
-                continue;
+                continue 2;
               }
               $this->updateStructure($node, $structure, $imported_element);
               break;
@@ -979,7 +979,7 @@ class AttachmentPreviewPlugin extends Plugin {
               $this->log(
                 "Your locator from %s is invalid, %s has not been implemented. Available options are: xpath,id,tag",
                 $source, $structure->locator);
-              continue;
+              continue 2;
           }
         } catch (\Exception $de) {
           $this->log("FAIL: %s triggered DOM error: %s", $source,
