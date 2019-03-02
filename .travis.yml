@@ -16,9 +16,6 @@ env:
 ### unsupported builds, like osTicket 1.10 with php 5.3
 matrix:
   fast_finish: true
-  exclude:
-    - php: 7.3
-      env: OSTICKET_VERSION=1.11
       
 # Turn off the xdebug extension, we don't use coverage reports, and the precise errors were annoying
 before_install:
