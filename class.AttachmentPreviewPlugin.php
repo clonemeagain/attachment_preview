@@ -165,8 +165,7 @@ class AttachmentPreviewPlugin extends Plugin {
       return $page;
     }
     $plugin = AttachmentPreviewPlugin::getInstance();
-    // Fetch the attachment limit from the config for later
-    $limit = $plugin->getConfig()->get('show-initially');
+    $config = $plugin->getConfig();
     $css = file_get_contents(__DIR__ . '/stylesheet.css');
 
     // Build a config object of options for javascript to use
@@ -174,11 +173,13 @@ class AttachmentPreviewPlugin extends Plugin {
     $plugin_options = (object) array(
       'text_show' => __('Show Attachment'),
       'text_hide' => __('Hide Attachment'),
-      'limit' => $limit,
-      'open_attachments' => $plugin->getConfig()->get('newtab-links') ? 'new-tab' : 'normal'
+      'limit' => $config->get('show-initially'),
+      'hide_seen' => $config->get('hide-seen') ? 1 : 0,
+      'hide_age' => $config->get('hide-age') ?: 14,
+      'open_attachments' => $config->get('newtab-links') ? 'new-tab' : 'normal'
     );
 
-    $plugin_js_variable = 'pluginConfig = ' . json_encode($plugin_options) . ';'; //NOTE: JSON_PRETTY_PRINT only available from 5.4+
+    $plugin_js_variable = 'AttachmentPreview = ' . json_encode($plugin_options) . ';'; //NOTE: JSON_PRETTY_PRINT only available from 5.4+
     // If we were able to simply link to the script, we could insert the settings and have the browser cache the script.. but noo
     // Fetch the file and replace the comment with the config to override the defaults:
     $script = str_replace('/* REPLACED_BY_PLUGIN */', $plugin_js_variable,
