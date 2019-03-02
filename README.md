@@ -25,7 +25,7 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 1. Now the plugin needs to be enabled & configured, so you should be seeing the list of currently installed plugins, pick the checkbox next to "Attachment Inline Plugin" and select the "Enable" button.
 1. Now you can configure the plugin, click the link "Attachment Inline Plugin" and choose who the plugin should be activated for, or keep the default.
 
-If you don't already have a PDF program on your computer, Chrome will still work (it does that for you), for Firefox you will need to enable it, eg: [enable pdf preview in firefoox](https://support.mozilla.org/en-US/kb/applications-panel-set-how-firefox-handles-files)
+If you don't already have a PDF program on your computer, Chrome will still work (it does that for you), for Firefox you will need to enable it, eg: [enable pdf preview in firefoox](https://support.mozilla.org/en-US/kb/change-firefox-behavior-when-open-file) and set "Preview in Firefox"
 
 ## To Remove:
 Navigate to admin plugins view, click the checkbox and push the "Delete" button.
