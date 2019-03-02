@@ -35,7 +35,7 @@ class AttachmentPreviewPlugin extends Plugin {
      *
      * @var string
      */
-    const DEBUG = FALSE;
+    const DEBUG = TRUE;
 
     /**
      * An array of messages to be logged. This plugin is called before $ost is
@@ -65,6 +65,7 @@ class AttachmentPreviewPlugin extends Plugin {
      * @var type 
      */
     static $instance = null;
+
 
     /**
      * Explicitly define a constructor, to wrap a $this reference as $instance
@@ -143,6 +144,14 @@ class AttachmentPreviewPlugin extends Plugin {
                 AttachmentPreviewPlugin::shutdownHandler();
             });
         }
+
+        if(!self::isPjax()){
+            // we inject our scripts once, then they just .. "work" :-)
+            ob_start();
+            register_shutdown_function(function(){
+                AttachmentPreviewPlugin::insertScript();
+            });
+        }
     }
 
     /**
@@ -163,6 +172,38 @@ class AttachmentPreviewPlugin extends Plugin {
             $plugin->debug_log("Appender appending appendable HTML");
             print $plugin->appended;
         }
+    }
+
+    public static function insertScript(){
+
+        $plugin = AttachmentPreviewPlugin::getInstance();
+// Fetch the attachment limit from the config for later
+            $limit  = $plugin->getConfig()->get('show-initially');
+            $css       = file_get_contents(__DIR__ . '/stylesheet.css');
+            $css = '<style>' . $css .'</style>';
+
+// Build a config object of options for javascript to use
+// This makes it translateable/dynamic/configurable etc.
+            $plugin_options = (object) array(
+                        'text_show'        => __('Show Attachment'),
+                        'text_hide'        => __('Hide Attachment'),
+                        'limit'            => $limit,
+                        'open_attachments' => $plugin->getConfig()->get('newtab-links') ? 'new-tab' : 'normal');
+
+            $plugin_js_variable = 'pluginConfig = ' . json_encode($plugin_options) . ';'; //NOTE: JSON_PRETTY_PRINT only available from 5.4+
+// If we were able to simply link to the script, we could insert the settings and have the browser cache the script.. but noo
+// Fetch the file and replace the comment with the config to override the defaults:
+            $script_source      = str_replace('/* REPLACED_BY_PLUGIN */', $plugin_js_variable, file_get_contents(__DIR__ . '/script.js'));
+            $script = '<script type="text/javascript">' . $script_source .'</script>';
+
+            // find the </head> tag, and insert our stylesheet just before it.
+            $head = '#</head>#';
+            $replacement = "$css\n</head>"; 
+            $page = preg_replace($head,$replacement,ob_get_clean());
+            // find the </body> tag, insert our javascript just before it.
+            $foot = '#</body>#';
+            $replacement = "$script\n</body>";
+            print preg_replace($foot,$replacement,$page);
     }
 
     /**
@@ -431,7 +472,7 @@ class AttachmentPreviewPlugin extends Plugin {
         $a->appendChild($img);
 
 // Add a title attribute to the download link:
-        $link->setAttribute('title', 'Download this image.');
+        $link->setAttribute('title', __('Download this image.'));
         $this->debug_log('Wrapped %s as image.', $link->textContent);
         $this->wrap($doc, $link, $a);
     }
@@ -454,12 +495,12 @@ class AttachmentPreviewPlugin extends Plugin {
 
 // Add a <b>Nope</b> type message for obsolete or text-based browsers.
         $message            = $doc->createElement('b');
-        $message->nodeValue = 'Your "browser" is unable to display this PDF. ';
+        $message->nodeValue = __('Your "browser" is unable to display this PDF. ');
         if ($this->getConfig()->get('show-ms-upgrade-help')) {
             $call_to_action            = $doc->createElement('a');
             $call_to_action->setAttribute('href', 'http://abetterbrowser.org/');
-            $call_to_action->setAttribute('title', 'Get a better browser to use this content inline.');
-            $call_to_action->nodeValue = 'Help';
+            $call_to_action->setAttribute('title', __('Get a better browser to use this content inline.'));
+            $call_to_action->nodeValue = __('Help');
             $message->appendChild($call_to_action);
         }
         $pdf->appendChild($message);
@@ -539,47 +580,8 @@ class AttachmentPreviewPlugin extends Plugin {
         static $number = 0;
         static $limit  = 0;
 
-        if (!$number) {
-            $number = 1;
-// Fetch the attachment limit from the config for later
-            $limit  = $this->getConfig()->get('show-initially');
-
-// First attachment added, insert our stylesheet:
-            $css       = $doc->createElement('style');
-            $css->setAttribute('name', 'Plugin: attachment_preview Stylesheet');
-            $css_cdata = $doc->createCDATASection(file_get_contents(__DIR__ . '/stylesheet.css'));
-            $css->appendChild($css_cdata);
-            $source->parentNode->appendChild($css);
-
-// This script enables toggling the display of attachments depending on config:
-            $toggle_script = $doc->createElement('script');
-            $toggle_script->setAttribute('type', 'text/javascript');
-            $toggle_script->setAttribute('name', 'Plugin: attachment_preview Script');
-
-// Build a config object of options for javascript to use
-// This makes it translateable/dynamic/configurable etc.
-            $plugin_options = (object) array(
-                        'text_show'        => __('Show Attachment'),
-                        'text_hide'        => __('Hide Attachment'),
-                        'limit'            => $limit,
-                        'open_attachments' => $this->getConfig()->get('newtab-links') ? 'new-tab' : 'normal');
-
-            $plugin_js_variable = 'pluginConfig = ' . json_encode($plugin_options) . ';'; //NOTE: JSON_PRETTY_PRINT only available from 5.4+
-// If we were able to simply link to the script, we could insert the settings and have the browser cache the script.. but noo
-// Fetch the file and replace the comment with the config to override the defaults:
-            $script_source      = str_replace('/* REPLACED_BY_PLUGIN */', $plugin_js_variable, file_get_contents(__DIR__ . '/script.js'));
-
-// Hack to work around https://bugs.php.net/bug.php?id=31613
-// from: http://php.net/manual/en/domdocument.createcdatasection.php
-            $script_cdata = $doc->createCDATASection("\n" . $script_source . "\n");
-            $toggle_script->appendChild($script_cdata);
-
-// Insert the script into the first wrapped element
-            $source->parentNode->appendChild($toggle_script);
-        }
-        else {
-            $number++;
-        }
+        $number++;
+        
 
 // Build a wrapper element to contain the attachment
         $wrapper = $doc->createElement('div');
@@ -593,6 +595,10 @@ class AttachmentPreviewPlugin extends Plugin {
 
 // Add the element to the wrapper
         $wrapper->appendChild($new_child);
+
+
+// Fetch the attachment limit from the config for later
+        $limit  = $this->getConfig()->get('show-initially');
 
 // See if we are over the admin-defined maximum number of inline-attachments:
         if ($limit == "ALL" || $number <= $limit) {
