@@ -2,7 +2,7 @@
 
 return array(
     'id' => 'clonemeagain:attachment_preview', # notrans
-    'version' => '1.0',
+    'version' => '1.11',
     'name' => 'Attachment Inline Plugin',
     'author' => 'clonemeagain@gmail.com',
     'description' => 'Modifies the page to include as many attachments as would make sense, directly into the Thread.',

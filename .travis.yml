@@ -1,13 +1,13 @@
 language: php
 php:
-  - 5.4
-  - 5.6
+  #- 5.6
   - 7.1
+  - 7.3
 
 # These are the current latest versions of osTicket
 env: 
-  - OSTICKET_VERSION=1.9.16
-  - OSTICKET_VERSION=1.10.1
+  - OSTICKET_VERSION=1.10.5
+  - OSTICKET_VERSION=1.11
   
 ### Prepare the build matrix for Travis to create the different tests we want
 ### Note: Each env above is mixed with each include directive here to create
@@ -16,9 +16,6 @@ env:
 ### unsupported builds, like osTicket 1.10 with php 5.3
 matrix:
   fast_finish: true
-  exclude:
-    - php: 7.1
-      env: OSTICKET_VERSION=1.9.16
       
 # Turn off the xdebug extension, we don't use coverage reports, and the precise errors were annoying
 before_install:
