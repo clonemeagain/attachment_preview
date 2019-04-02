@@ -18,7 +18,7 @@ An [osTicket](https://github.com/osTicket/osTicket) plugin allowing inlining of 
 - Plugin API: allows other plugins to manipulate the DOM without adding race conditions or multiple re-parses.
 
 ## To Install:
-1. Simply `git clone https://github.com/clonemeagain/attachment_preview.git /includes/plugins/attachment_preview` Or extract [latest-zip](https://github.com/clonemeagain/attachment_preview/archive/master.zip) into /includes/plugins/attachment_preview
+1. Simply `git clone https://github.com/clonemeagain/attachment_preview.git /include/plugins/attachment_preview` Or extract [latest-zip](https://github.com/clonemeagain/attachment_preview/archive/master.zip) into /include/plugins/attachment_preview
 1. Navigate to: https://your.domain/support/scp/plugins.php?a=add to add a new plugin.
 1. Click "Install" next to "Attachment Inline Plugin"
 1. Now the plugin needs to be enabled & configured, so you should be seeing the list of currently installed plugins, pick the checkbox next to "Attachment Inline Plugin" and select the "Enable" button.
@@ -46,7 +46,7 @@ The plugin has several administratively configurable options, including, but not
 * If the browser should remember the attachments it's seen, and if so, for how long.
 
 The plugin is completely self-contained, so there are ZERO MODS to core required to get it working. 
-You simply clone the repo or download the zip from github and extract into /includes/plugins/ which should make a folder: "attachment_preview", but it could be called anything. 
+You simply clone the repo or download the zip from github and extract into /include/plugins/ which should make a folder: "attachment_preview", but it could be called anything. 
 
 
 ## Note on CI
