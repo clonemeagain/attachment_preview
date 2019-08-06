@@ -1057,7 +1057,7 @@ class AttachmentPreviewPlugin extends Plugin {
       $tickets_view = FALSE;
     }
     elseif (strpos($url, 'index.php') !== FALSE ||
-      strpos($url, 'tickets.php') !== FALSE) ||
+      strpos($url, 'tickets.php') !== FALSE ||
       strpos($url, 'tasks.php') !== FALSE) {
       // Might be a ticket page or a task page
       $tickets_view = TRUE;
