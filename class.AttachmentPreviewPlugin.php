@@ -1056,10 +1056,12 @@ class AttachmentPreviewPlugin extends Plugin {
       // URL contains a=edit or a=print, so assume we aren't needed here!
       $tickets_view = FALSE;
     }
-    elseif (strpos($url, 'index.php') !== FALSE ||
-      strpos($url, 'tickets.php') !== FALSE) {
-      // Might be a ticket page..
-      $tickets_view = TRUE;
+    elseif 
+	 // URL contains a ticket ID and page is index.php or tickets.php, we are viewing a ticket
+     (strpos($url, 'id=') !== FALSE &&
+	 (strpos($url, 'index.php') !== FALSE ||
+      strpos($url, 'tickets.php') !== FALSE))  {      
+		$tickets_view = TRUE;
     }
     else {
       // Default
