@@ -80,12 +80,17 @@ class AttachmentPreviewPlugin extends Plugin {
    * @return AttachmentPreviewPlugin
    * @throws Exception
    */
-  public static function getInstance() {
-    if (! self::$instance) {
-      throw new Exception(
-        'Invalid use, please wait for the plugins to Bootstrap properly.');
-    }
-    return self::$instance;
+ /** public static function getInstance() {
+  *  if (! self::$instance) {
+  *    throw new Exception(
+  *      'Invalid use, please wait for the plugins to Bootstrap properly.');
+  *  }
+  *  return self::$instance;
+  */
+
+  // Taken from oath2 plugin, seems to avoid php8 errors from the above code
+  function getPluginInstance($id) {
+    return $this->getPlugin()->getInstance($id);
   }
 
   /**
