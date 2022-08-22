@@ -73,24 +73,15 @@ class AttachmentPreviewPlugin extends Plugin {
     }
   }
 
-  /**
-   * Singleton pattern Relies on the normal bootstrap phase from osTicket to
-   * construct the only instance we want.
-   *
-   * @return AttachmentPreviewPlugin
-   * @throws Exception
-   */
- /** public static function getInstance() {
-  *  if (! self::$instance) {
-  *    throw new Exception(
-  *      'Invalid use, please wait for the plugins to Bootstrap properly.');
-  *  }
-  *  return self::$instance;
-  */
-
-  // Taken from oath2 plugin, seems to avoid php8 errors from the above code
   function getPluginInstance($id) {
     return $this->getPlugin()->getInstance($id);
+  }
+
+  static function getInstanceStatic() {
+    if (self::$instance == null) {
+      self::$instance = new AttachmentPreviewPlugin(1);
+    }
+    return self::$instance;
   }
 
   /**
@@ -148,7 +139,7 @@ class AttachmentPreviewPlugin extends Plugin {
    * properly..
    */
   public static function shutdownHandler() {
-    $plugin = AttachmentPreviewPlugin::getInstance();
+    $plugin = AttachmentPreviewPlugin::getInstanceStatic();
     $plugin->debug_log("Shutdown handler for inline attachments running");
     // Output the buffer
     // Check for Attachable's and print
@@ -169,7 +160,7 @@ class AttachmentPreviewPlugin extends Plugin {
       // script is already loaded, don't inject again.
       return $page;
     }
-    $plugin = AttachmentPreviewPlugin::getInstance();
+    $plugin = AttachmentPreviewPlugin::getInstanceStatic();
     $config = $plugin->getConfig();
     $css = file_get_contents(__DIR__ . '/stylesheet.css');
 
@@ -655,7 +646,7 @@ class AttachmentPreviewPlugin extends Plugin {
    * @return \DOMDocument
    */
   public static function getDom($html = '') {
-    $p = self::getInstance();
+    $p = self::getInstanceStatic();
     $dom = new \DOMDocument('1.0', 'UTF-8');
     $dom->validateOnParse = true;
     $dom->resolveExternals = true;
@@ -694,7 +685,7 @@ class AttachmentPreviewPlugin extends Plugin {
    * @return bool|string
    */
   public static function printDom(DOMDocument $dom) {
-    $p = self::getInstance();
+    $p = self::getInstanceStatic();
     $p->debug_log("Converting the DOM back to HTML");
     // Check for failure to generate HTML
     // DOMDocument::saveHTML() returns null on error
@@ -818,7 +809,7 @@ class AttachmentPreviewPlugin extends Plugin {
     if (self::DEBUG) {
       // note: static function can't call $this->debug_log()
       if (self::DEBUG) {
-        $p = self::getInstance();
+        $p = self::getInstanceStatic();
         $p->debug_log("Received %d chars of arbitrary HTML", strlen($html));
       }
     }
@@ -852,7 +843,7 @@ class AttachmentPreviewPlugin extends Plugin {
   public static function add_arbitrary_script($script) {
     static $script_count = 1;
     if (self::DEBUG) {
-      $p = self::getInstance();
+      $p = self::getInstanceStatic();
       $p->debug_log("Received %d chars of arbitrary script injection",
         strlen($script));
     }
