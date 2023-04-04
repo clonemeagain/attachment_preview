@@ -63,6 +63,28 @@ class AttachmentPreviewPlugin extends Plugin {
     self::$instance = $this;
   }
 
+    //we use this to save the correct config in the bootstrap method
+    //and override the buggy getConfig() from osticket
+    static $_correctConfig = null;
+
+    /**
+     * We override the getConfig method, because on
+     * OsTicket 1.7.5 (at least) the getConfig does only
+     * return the correct config in the bootstrap method.
+     * On all other occasions, it will return the default
+     * config.
+     * @param PluginInstance|null $instance
+     * @param $defaults
+     * @return mixed|null
+     */
+  public function getConfig(PluginInstance $instance = null, $defaults = [])
+  {
+      if (self::$_correctConfig) {
+          return self::$_correctConfig;
+      }
+      return parent::getConfig($instance, $defaults);
+  }
+
   /**
    * Replacing the register_shutdown_function's anonymous use of $this with the
    * object's destructor for PHP5.3 compatibility
@@ -96,6 +118,8 @@ class AttachmentPreviewPlugin extends Plugin {
    * @see Plugin::bootstrap()
    */
   function bootstrap() {
+    //fix: save correct config, which works only here in bootstrap
+    self::$_config = $this->getConfig();
     // Ensure plugin does not run during cli cron calls. There is no DOM to manipulate in CLI mode.
     if (php_sapi_name() == 'cli') {
       return;
