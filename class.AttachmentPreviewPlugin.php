@@ -119,7 +119,7 @@ class AttachmentPreviewPlugin extends Plugin {
    */
   function bootstrap() {
     //fix: save correct config, which works only here in bootstrap
-    self::$_config = $this->getConfig();
+    self::$_correctConfig = $this->getConfig();
     // Ensure plugin does not run during cli cron calls. There is no DOM to manipulate in CLI mode.
     if (php_sapi_name() == 'cli') {
       return;
