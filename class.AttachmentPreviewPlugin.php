@@ -193,10 +193,20 @@ class AttachmentPreviewPlugin extends Plugin
     {
         // $plugin = AttachmentPreviewPlugin::getInstance();
         $plugin->debug_log("Shutdown handler for inline attachments running");
+        $buffer = ob_get_clean();
+
+        // Downloads (ZIP export, PDF print etc.) share the ticket URLs, but they aren't HTML.
+        // Running them through DOMDocument corrupts them, so send them through untouched.
+        if (!self::isHtmlResponse()) {
+            $plugin->debug_log("Response isn't HTML, leaving it alone.");
+            print $buffer;
+            return;
+        }
+
         // Output the buffer
         // Check for Attachable's and print
         // Note: This also checks foreign_elements
-        $page = $plugin->inlineAttachments(ob_get_clean());
+        $page = $plugin->inlineAttachments($buffer);
 
         // We should only embed the scripts once, however, if you aren't seeing it work, you'll have to refresh.. 
         $page = $plugin->insertScript($page);
@@ -1212,8 +1222,8 @@ class AttachmentPreviewPlugin extends Plugin
         } elseif (isset($_POST) && count($_POST)) {
             // If something has been POST'd to osTicket, assume we're not Viewing a ticket
             $tickets_view = false;
-        } elseif (strpos($url, 'a=edit') || strpos($url, 'a=print')) {
-            // URL contains a=edit or a=print, so assume we aren't needed here!
+        } elseif (strpos($url, 'a=edit') || strpos($url, 'a=print') || strpos($url, 'a=zip')) {
+            // URL contains a=edit, a=print or a=zip, so assume we aren't needed here!
             $tickets_view = false;
         } elseif
             // URL contains a ticket ID and page is index.php or tickets.php, we are viewing a ticket
@@ -1232,6 +1242,31 @@ class AttachmentPreviewPlugin extends Plugin
         }
 
         return $tickets_view;
+    }
+
+    /**
+     * Determines from the headers sent so far whether the buffered response is
+     * an HTML page. Downloads set a Content-Disposition of attachment, or a
+     * Content-Type other than text/html. No Content-Type at all means PHP's
+     * default (text/html) applies.
+     *
+     * @return bool
+     */
+    public static function isHtmlResponse(): bool
+    {
+        foreach (headers_list() as $header) {
+            [$name, $value] = array_pad(explode(':', $header, 2), 2, '');
+            $name = strtolower(trim($name));
+            $value = strtolower(trim($value));
+
+            if ($name === 'content-disposition' && str_starts_with($value, 'attachment')) {
+                return false;
+            }
+            if ($name === 'content-type' && !str_starts_with($value, 'text/html')) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
