@@ -221,12 +221,12 @@ var sanitizer = {};
     var safe = '<a><b><blockquote><dd><div><dl><dt><em><h1><h2><h3><h4><i><img><li><ol><p><pre><s><sup><sub><strong><strike><ul><br><hr><table><th><tr><td><tbody><tfoot>';
 
     function trimAttributes(node) {
-        $.each(node.attributes, function() {
-            var attrName = this.name;
-            var attrValue = this.value;
-            // we could filter the "bad" attributes, or just purge them all..
-            $(node).removeAttr(attrName);
-        });
+        // node.attributes is live: removing while walking forwards skips every
+        // second attribute and then runs past the end (TypeError in strict mode).
+        // Walk backwards so every attribute goes.
+        for (var i = node.attributes.length - 1; i >= 0; i--) {
+            node.removeAttribute(node.attributes[i].name);
+        }
     }
     sanitizer.sanitize = function(html) {
         html = strip_tags(html, safe);
