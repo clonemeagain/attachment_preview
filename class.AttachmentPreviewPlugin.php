@@ -456,6 +456,7 @@ class AttachmentPreviewPlugin extends Plugin
           'text'  => [
             'csv',
             'txt',
+            'eml',
           ],
           'html'  => [
             'html',

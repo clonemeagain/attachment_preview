@@ -66,7 +66,7 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
         )),
       'attach-text' => new BooleanField(
         array(
-          'label' => $__('Inline textfiles (txt,csv) as <pre>'),
+          'label' => $__('Inline textfiles (txt,csv,eml) as <pre>'),
           'default' => TRUE
         )),
       'attach-html' => new BooleanField(
