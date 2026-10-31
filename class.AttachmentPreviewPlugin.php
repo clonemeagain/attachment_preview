@@ -70,6 +70,15 @@ class AttachmentPreviewPlugin extends Plugin
 
     private static $instance;
 
+    /**
+     * Set once the first instance has started buffering the page. osTicket calls
+     * bootstrap() once per enabled plugin instance, and a second buffer would run
+     * the page through inlineAttachments() twice, showing every attachment twice.
+     *
+     * @var bool
+     */
+    private static bool $buffering = false;
+
 
     /**
      * Try and do as little as possible in the bootstrap function, as it is called
@@ -90,7 +99,7 @@ class AttachmentPreviewPlugin extends Plugin
             return;
         }
 
-        self::$instance = $this->getConfig();
+        $config = $this->getConfig();
         //self::$instance = $this->config->instance; // plugins are instanced now.
 
         // Assuming that other plugins want to inject an element or two..
@@ -113,10 +122,13 @@ class AttachmentPreviewPlugin extends Plugin
         // Check what our URI is, if acceptable, add to the output.. :-)
         // Looks like there is no central router in osTicket yet, so I'll just parse REQUEST_URI
         // Can't go injecting this into every page.. we only want it for the actual ticket pages & Knowledgebase Pages
-        if (self::isTicketsView() && self::$instance->get('attachment-enabled')) {
+        if (!self::$buffering && self::isTicketsView() && $config->get('attachment-enabled')) {
             $this->debug_log(
               "Agent requested a tickets-view: Starting the attachments plugin."
             );
+            // Only the instance that buffers the page decides how it is rendered.
+            self::$instance = $config;
+            self::$buffering = true;
             // We could hack at core, or we can simply capture the whole page output and modify the HTML then..
             // Not "easier", but less likely to break core.. right?
             // There appears to be a few uses of ob_start in the codebase, but they stack, so it works!
