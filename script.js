@@ -13,7 +13,8 @@ var AttachmentPreview = {
 // Leave the next line intact, as the plugin will replace it with settings overriding the defaults above.
 /* REPLACED_BY_PLUGIN */
 
-AttachmentPreview.oldest_timestamp = new Date(Date.now() - 1000 * 60 * 60 * 24 * this.hide_age);
+// Entries last seen before this point in time (ms) are forgotten.
+AttachmentPreview.oldest_timestamp = Date.now() - 1000 * 60 * 60 * 24 * (parseInt(AttachmentPreview.hide_age, 10) || 14);
 /** 
  * https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API
  * @param type
@@ -54,17 +55,31 @@ AttachmentPreview.getAvailableStorage = function() {
 };
 
 // Maintain a list of all the attachments the user has seen.. likely needs some form of cache/expiry type system.
-AttachmentPreview.seen_ids = {};
+AttachmentPreview.seen_ids = null;
 AttachmentPreview.cache_key = 'attachment_preview_ids';
-AttachmentPreview.already_seen = function(tid, id) {
-    if (typeof this.seen_ids == 'undefined' || !this.seen_ids.length) {
-        this.seen_ids = JSON.parse(this.getAvailableStorage().getItem(this.cache_key)) || {};
-        // Check if this ticket it has expired
-        if (typeof this.seen_ids[tid] !== 'undefined') {
-            if (this.seen_ids[tid].last_seen > this.max_age) {
-                delete this.seen_ids[tid];
-            };
+AttachmentPreview.load_seen = function() {
+    var storage = this.getAvailableStorage(),
+        seen = {};
+    try {
+        seen = JSON.parse(storage.getItem(this.cache_key)) || {};
+    } catch (e) {
+        seen = {};
+    }
+    // Forget every ticket that hasn't been looked at within hide_age days.
+    for (var tid in seen) {
+        if (!seen.hasOwnProperty(tid)) {
+            continue;
         }
+        if (!seen[tid] || !(seen[tid].last_seen >= this.oldest_timestamp)) {
+            delete seen[tid];
+        }
+    }
+    this.seen_ids = seen;
+    storage.setItem(this.cache_key, JSON.stringify(seen));
+};
+AttachmentPreview.already_seen = function(tid, id) {
+    if (this.seen_ids === null) {
+        this.load_seen();
     }
 
     if (typeof this.seen_ids[tid] !== 'undefined') {
@@ -89,24 +104,48 @@ AttachmentPreview.already_seen = function(tid, id) {
     return false;
 };
 
+// The ticket (or task) being viewed. The lock form isn't there when ticket locking is off, so fall back to ?id=
+AttachmentPreview.ticket_id = function() {
+    var lock = $('input[name="lockCode"]').closest('form').data('lock-object-id');
+    if (lock) {
+        return String(lock).substring(7);
+    }
+    var match = window.location.search.match(/[?&]id=(\d+)/);
+    return match ? match[1] : 'unknown';
+};
+
+// A stable id for an attachment: osTicket's file key, or the embed URL for players.
+// The wrapper's position on the page (ap-file-N) changes as soon as a new reply arrives.
+AttachmentPreview.attachment_key = function($wrapper) {
+    var $child = $wrapper.find('[data-url], iframe, source, audio').first(),
+        url = $child.attr('data-url') || $child.attr('src') || '',
+        match = url.match(/[?&]key=([^&]+)/);
+    if (match) {
+        return match[1];
+    }
+    return url || $wrapper.attr('id');
+};
+
 AttachmentPreview.init = function() {
     // Don't we need  pjax:success any more?
     var attachments = $(".ap_embedded:not(.hidden)");
     if (attachments.length) {
         console.log("Fetching " + attachments.length + " non-hidden attachment[s].");
         if (AttachmentPreview.hide_seen) {
-            var ticket_id = $('input[name="lockCode"]').closest('form').data('lock-object-id').substring(7);
+            var ticket_id = AttachmentPreview.ticket_id();
             attachments.each(function(idx) {
                 var $a = $(this),
                     id = $a.attr('id'),
-                    attachment_number = id.substring(8);
-                if (!AttachmentPreview.already_seen(ticket_id, attachment_number)) {
+                    attachment_key = AttachmentPreview.attachment_key($a);
+                if (!AttachmentPreview.already_seen(ticket_id, attachment_key)) {
                     $a.trigger('ap:fetch');
                 } else {
-                    // User has already seen this attachment, show the button to toggle if they want to fetch/view it again:
+                    // User has already seen this attachment, show the button to toggle if they want to fetch/view it again.
+                    // The button goes right before this wrapper: YouTube links have no small.filesize to attach to (#35),
+                    // and several attachments can share one parent.
                     var js_id = "'" + id.trim() + "'";
                     $a.hide().addClass('hidden');
-                    $a.parent().find('small.filesize').after('<a class="button" onclick="ap_toggle(this,' + js_id + ');" target="_blank">' + AttachmentPreview.text_show + '</a>');
+                    $a.before('<a class="button" onclick="return ap_toggle(this,' + js_id + ');">' + AttachmentPreview.text_show + '</a>');
                 }
             });
         } else {
