@@ -92,6 +92,12 @@ class AttachmentPreviewPluginConfig extends PluginConfig {
           'label' => $__('Inline Youtube links to Players'),
           'default' => FALSE
         )),
+      'attach-vimeo' => new BooleanField(
+        array(
+          'label' => $__('Inline Vimeo links to Players'),
+          'hint' => $__('Loads the player from player.vimeo.com (with dnt=1) whenever an agent opens the ticket.'),
+          'default' => FALSE
+        )),
       'show-ms-upgrade-help' => new BooleanField(
         array(
           'label' => $__('Show IE upgrade link'),

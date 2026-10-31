@@ -323,6 +323,7 @@ class AttachmentPreviewPlugin extends Plugin
 
         // cache setting 
         $rewrite_youtube = (bool)$config->get('attach-youtube');
+        $rewrite_vimeo = (bool)$config->get('attach-vimeo');
         $size_limit = (int)$config->get('attachment-size');
         // Find all <a> elements: http://stackoverflow.com/a/29272222 as DOMElement's
         foreach ($dom->getElementsByTagName('a') as $link) {
@@ -405,16 +406,19 @@ class AttachmentPreviewPlugin extends Plugin
                 //                    }
                 //                    $attachments_inlined++;
                 //                }
-            } elseif ($rewrite_youtube) {
+            } elseif ($rewrite_youtube && str_contains($link->getAttribute('href'), 'youtub')) {
                 // This link isn't to /file.php & admin have asked us to check if it is a youtube link.
                 // The overhead of checking strpos on every URL is less than the overhead of checking for a youtube ID!
-                if (str_contains($link->getAttribute('href'), 'youtub')) {
-                    try {
-                        $this->add_youtube($dom, $link);
-                    } catch (Throwable) {
-                        $this->log("Exception encountered injecting Youtube player");
-                    }
-                    $attachments_inlined++;
+                try {
+                    $attachments_inlined += $this->add_youtube($dom, $link);
+                } catch (Throwable) {
+                    $this->log("Exception encountered injecting Youtube player");
+                }
+            } elseif ($rewrite_vimeo && str_contains($link->getAttribute('href'), 'vimeo.com')) {
+                try {
+                    $attachments_inlined += $this->add_vimeo($dom, $link);
+                } catch (Throwable) {
+                    $this->log("Exception encountered injecting Vimeo player");
                 }
             }
         }
@@ -654,6 +658,66 @@ class AttachmentPreviewPlugin extends Plugin
             return 1;
         }
         return 0;
+    }
+
+    /**
+     * Converts a link to a Vimeo video into Vimeo's player, eg:
+     * https://vimeo.com/417068781, https://vimeo.com/417068781/abcdef1234 (unlisted)
+     * or https://player.vimeo.com/video/417068781. The player is loaded with
+     * dnt=1, so Vimeo doesn't track the agent.
+     *
+     * @param  DOMDocument  $doc
+     * @param  DOMElement  $link
+     *
+     * @throws \DOMException
+     */
+    private function add_vimeo(DOMDocument $doc, DOMElement $link): int
+    {
+        $video = $this->getVimeoIdFromUrl($link->getAttribute('href'));
+        if ($video === false) {
+            return 0;
+        }
+        $src = 'https://player.vimeo.com/video/'.$video['id'].'?dnt=1';
+        if ($video['hash'] !== '') {
+            $src .= '&h='.$video['hash'];
+        }
+        $player = $doc->createElement('iframe');
+        $player->setAttribute('width', '560');
+        $player->setAttribute('height', '315');
+        $player->setAttribute('src', $src);
+        $player->setAttribute('frameborder', 0);
+        $player->setAttribute('allow', 'fullscreen; picture-in-picture');
+        $player->setAttribute('allowfullscreen', 1);
+        $player->setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        $player->setAttribute('loading', 'lazy');
+        $this->debug_log('Wrapped %s as vimeo player.', $link->textContent);
+        $this->wrap($doc, $link, $player);
+        return 1;
+    }
+
+    /**
+     * Get the Vimeo video id (and the privacy hash of unlisted videos) from a URL.
+     *
+     * @param  string  $url
+     *
+     * @return array|false ['id' => '417068781', 'hash' => ''] or FALSE if not a video
+     */
+    public function getVimeoIdFromUrl($url): array|false
+    {
+        $host = strtolower((string)parse_url($url, PHP_URL_HOST));
+        if (!in_array($host, ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'], true)) {
+            return false;
+        }
+        $path = (string)parse_url($url, PHP_URL_PATH);
+        if (!preg_match('#^/(?:video/)?(\d{1,12})(?:/([0-9a-f]{6,20}))?/?$#', $path, $match)) {
+            return false;
+        }
+        $hash = $match[2] ?? '';
+        // player.vimeo.com URLs carry the hash as ?h=
+        if ($hash === '' && preg_match('/(?:^|&)h=([0-9a-f]{6,20})(?:&|$)/', (string)parse_url($url, PHP_URL_QUERY), $h)) {
+            $hash = $h[1];
+        }
+        return ['id' => $match[1], 'hash' => $hash];
     }
 
     /**
