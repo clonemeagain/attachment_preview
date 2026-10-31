@@ -197,9 +197,10 @@ AttachmentPreview.handleFetchEvent = function(e) {
                 }
             case 'text':
                 // Replace the <pre> element's text with the Attachment:
+                // dataType 'text': never let jQuery interpret the response based on its Content-Type.
                 $.get(url, function(data) {
                     elem.text(data);
-                });
+                }, 'text');
                 break;
             case 'html':
                 // Replace the html with the attachment, after passing
@@ -207,7 +208,7 @@ AttachmentPreview.handleFetchEvent = function(e) {
                 $.get(url, function(data) {
                     elem.html($("<div>" + $.trim(sanitizer.sanitize(data)) +
                         "</div>"));
-                });
+                }, 'text');
         }
         // prevent repeated fetch events from re-fetching
         elem.data('type', '');
