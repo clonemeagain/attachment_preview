@@ -636,19 +636,22 @@ class AttachmentPreviewPlugin extends Plugin
     private function add_youtube(DOMDocument $doc, DOMElement $link): int
     {
         $youtube_id = $this->getYoutubeIdFromUrl($link->getAttribute('href'));
-        if ($youtube_id !== false) {
+        // Video ids are [A-Za-z0-9_-]; anything else isn't a video and stays a plain link.
+        if ($youtube_id !== false && preg_match('/^[A-Za-z0-9_-]{6,20}$/', $youtube_id)) {
             // Now we can add an iframe so the video is instantly playable.
-            // eg: <iframe width="560" height="349" src="http://www.youtube.com/embed/something?rel=0&hd=1" frameborder="0" allowfullscreen></iframe>
+            // youtube-nocookie.com doesn't set tracking cookies until the agent presses play.
             // TODO: Make responsive.. if required.
             $player = $doc->createElement('iframe');
             $player->setAttribute('width', '560');
             $player->setAttribute('height', '349');
             $player->setAttribute(
               'src',
-              'https://www.youtube.com/embed/'.$youtube_id.'?rel=0&hd=1'
+              'https://www.youtube-nocookie.com/embed/'.$youtube_id.'?rel=0'
             );
             $player->setAttribute('frameborder', 0);
             $player->setAttribute('allowfullscreen', 1);
+            $player->setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+            $player->setAttribute('loading', 'lazy');
             $this->debug_log('Wrapped %s as youtube player.', $link->textContent);
             $this->wrap($doc, $link, $player);
             return 1;
